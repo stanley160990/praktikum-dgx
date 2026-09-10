@@ -1,0 +1,95 @@
+# ============================================================
+# Docker Compose: Sistem Pengelolaan Jadwal & Akun Kursus Mahasiswa
+# Layanan: PostgreSQL 16 + Web App (Node.js/React) + pgAdmin 4
+# ============================================================
+
+version: '3.8'
+
+services:
+  # ------------------------------------------------------------
+  # 1. DATABASE: PostgreSQL 16
+  # Skema & data awal diinisialisasi otomatis via database.sql
+  # ------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: db_kursus_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-db_kursus_mahasiswa}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-postgres123}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      # Skrip database.sql otomatis dieksekusi saat container pertama kali dibuat
+      - ./database.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-db_kursus_mahasiswa}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kursus_network
+
+  # ------------------------------------------------------------
+  # 2. WEB APPLICATION: React + Node.js Express Fullstack
+  # ------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app_kursus_mahasiswa
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-db_kursus_mahasiswa}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres123}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - app_data:/app/data
+    networks:
+      - kursus_network
+
+  # ------------------------------------------------------------
+  # 3. DATABASE GUI: pgAdmin 4 (Web Interface Management)
+  # Akses melalui: http://localhost:5050
+  # Login: admin@kursus.local / admin123
+  # ------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin_kursus
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@kursus.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kursus_network
+
+# ------------------------------------------------------------
+# NETWORKS & VOLUMES
+# ------------------------------------------------------------
+networks:
+  kursus_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  app_data:
+    driver: local
