@@ -179,7 +179,7 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
                 className="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded shadow-sm hover:bg-gray-50 transition flex items-center gap-1.5"
               >
                 <Upload className="w-4 h-4" />
-                Upload Jadwal (Popup)
+                Upload Jadwal
               </button>
             )}
 

@@ -272,46 +272,36 @@ File format: `.xlsx` atau `.xls`. Baris pertama wajib memuat 11 kolom:
 
 ## 💻 Panduan Menjalankan Aplikasi
 
-### Opsi 1: Menggunakan Docker Compose (Sangat Direkomendasikan)
+### Opsi 1: Menggunakan Docker Compose (Aplikasi Web)
 
-Dengan Docker Compose, Anda **tidak perlu menginstal PostgreSQL atau Node.js secara manual**. Seluruh database PostgreSQL (beserta skema tabel dan data awal dari `database.sql`), aplikasi web, dan pgAdmin 4 akan langsung aktif dan terkonfigurasi secara otomatis dalam satu perintah.
+`docker-compose.yml` dikonfigurasikan khusus untuk menjalankan container aplikasi web (`app`) yang terhubung langsung ke server PostgreSQL yang telah Anda sediakan:
 
-#### 1. Jalankan Seluruh Layanan:
+#### 1. Jalankan Aplikasi Web:
 ```bash
 docker compose up -d --build
 ```
 
-Docker akan mengunduh image dan menjalankan 3 container:
-- 🐘 **`postgres`** (Port `5432`): Database PostgreSQL 16 Alpine. File `database.sql` di-*mount* ke folder `/docker-entrypoint-initdb.d/01-init.sql` sehingga **database, tabel, indeks, dan data awal otomatis dibuat saat container pertama kali start**.
-- 🌐 **`app`** (Port `3000`): Aplikasi Fullstack Node.js + Express + React yang langsung terhubung ke database.
-- 🖥️ **`pgadmin`** (Port `5050`): Web GUI resmi pgAdmin 4 untuk manajemen visual database PostgreSQL.
+Container **`app`** (Port `3000`) akan dibangun dan langsung berjalan, menghubungkan sistem backend ke host database PostgreSQL sesuai konfigurasi file `.env`.
 
-#### 2. Akses Aplikasi & Database GUI:
+> **Catatan Layanan Database & pgAdmin:**
+> Pada `docker-compose.yml`, layanan `postgres` dan `pgadmin` telah dinonaktifkan (diberi tanda komentar `#`) karena database di-hosting pada server terpisah. Jika sewaktu-waktu Anda ingin menjalankan PostgreSQL atau pgAdmin lokal dalam Docker, Anda cukup menghapus tanda komentar (`#`) pada bagian tersebut di `docker-compose.yml`.
+
+#### 2. Akses Aplikasi:
 - **Aplikasi Web Kursus**: Buka [http://localhost:3000](http://localhost:3000)
-- **pgAdmin 4 (Web GUI)**: Buka [http://localhost:5050](http://localhost:5050)
-  - **Email**: `admin@kursus.local`
-  - **Password**: `admin123`
-  - *(Untuk menghubungkan ke DB dari pgAdmin: Host name/address = `postgres`, Port = `5432`, Maintenance DB = `db_kursus_mahasiswa`, Username = `postgres`, Password = `postgres123`)*
 
 #### 3. Perintah Manajemen Docker yang Sering Digunakan:
 ```bash
-# Melihat status seluruh container
+# Melihat status container
 docker compose ps
 
 # Melihat log aplikasi secara real-time
 docker compose logs -f app
 
-# Melihat log database PostgreSQL
-docker compose logs -f postgres
-
-# Menghentikan seluruh container (data tetap tersimpan di volume)
+# Menghentikan container
 docker compose stop
 
-# Menghapus container tanpa menghapus data
+# Menghapus container
 docker compose down
-
-# Mereset database secara bersih (hapus volume dan buat ulang dari database.sql)
-docker compose down -v && docker compose up -d --build
 ```
 
 ---

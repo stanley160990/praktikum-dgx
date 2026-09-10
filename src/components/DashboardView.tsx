@@ -84,7 +84,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="px-4 py-2 bg-white text-[#525FE1] text-sm font-medium rounded shadow-sm hover:bg-gray-50 flex items-center gap-2 transition"
           >
             <Upload className="w-4 h-4" />
-            Upload Jadwal (Popup)
+            Upload Jadwal
           </button>
           <button
             onClick={() => onNavigate('status-login')}

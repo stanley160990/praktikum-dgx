@@ -133,7 +133,7 @@ export const UploadMateriModal: React.FC<UploadMateriModalProps> = ({
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 text-base">Popup Upload Excel Materi (M1 s/d M10)</h3>
+              <h3 className="font-bold text-gray-900 text-base">Upload Materi Kursus (M1 s/d M10)</h3>
               <p className="text-xs text-gray-500">Unggah silabus materi pembelajaran untuk setiap NPM mahasiswa</p>
             </div>
           </div>
