@@ -17,7 +17,8 @@ import {
   dbConfig, 
   getSanitizedConfig, 
   getDatabaseStatus, 
-  testDatabaseConnection 
+  testDatabaseConnection,
+  importDatabaseSql
 } from './server/database';
 
 // ==========================================
@@ -59,6 +60,16 @@ app.post('/api/database/test', async (req, res) => {
   }
 });
 
+// Dedicated route: Inisiasi Manual dari database.sql oleh Admin
+app.post('/api/database/import-sql', async (req, res) => {
+  try {
+    const result = await importDatabaseSql();
+    res.json({ success: true, message: result.message });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // 2. Admin Login (SQL Query verification)
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -72,7 +83,13 @@ app.post('/api/auth/login', async (req, res) => {
     const result = await db.query(query, [username]);
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ success: false, message: 'Username tidak ditemukan di database SQL!' });
+      // Periksa apakah tabel admin_users masih kosong (belum diimport database.sql)
+      const countRes = await db.query('SELECT COUNT(*) as c FROM admin_users');
+      const isEmpty = Number((countRes.rows[0] as any)?.c || 0) === 0;
+      const msg = isEmpty
+        ? 'Tabel pengguna admin masih kosong. Silakan import database.sql terlebih dahulu untuk inisiasi awal.'
+        : 'Username tidak ditemukan di database SQL!';
+      return res.status(401).json({ success: false, message: msg, needImport: isEmpty });
     }
 
     const user = result.rows[0] as any;

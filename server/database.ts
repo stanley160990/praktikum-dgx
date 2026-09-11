@@ -144,85 +144,37 @@ export async function initDatabase(): Promise<PGlite> {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_status_login_npm ON status_login_mahasiswa(npm);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_status_login_tgl ON status_login_mahasiswa(tgl_login);`);
 
-    // Seed Akun Admin Default
-    const adminCheck = await db.query(`SELECT COUNT(*) as count FROM admin_users WHERE username = 'admin'`);
-    if (Number((adminCheck.rows[0] as any).count) === 0) {
-      await db.query(
-        `INSERT INTO admin_users (username, password, nama_lengkap) VALUES ($1, $2, $3)`,
-        ['admin', 'admin123', 'Administrator Utama']
-      );
-    }
-
-    // Seed Referensi Sesi
-    const sesiCheck = await db.query(`SELECT COUNT(*) as count FROM ref_sesi`);
-    if (Number((sesiCheck.rows[0] as any).count) === 0) {
-      await db.query(`
-        INSERT INTO ref_sesi (nomor_sesi, nama_sesi, waktu_mulai, waktu_selesai, keterangan) VALUES
-        (1, 'Sesi 1 (Pagi Utama)', '08:00', '10:00', 'Sesi kuliah dan praktikum pagi'),
-        (2, 'Sesi 2 (Siang Awal)', '10:15', '12:15', 'Sesi kuliah menjelang istirahat'),
-        (3, 'Sesi 3 (Siang Lanjutan)', '13:00', '15:00', 'Sesi kuliah setelah istirahat dzuhur'),
-        (4, 'Sesi 4 (Sore)', '15:15', '17:15', 'Sesi kuliah sore hari')
-      `);
-    }
-
-    // Seed Referensi Kelas
-    const kelasCheck = await db.query(`SELECT COUNT(*) as count FROM ref_kelas`);
-    if (Number((kelasCheck.rows[0] as any).count) === 0) {
-      await db.query(`
-        INSERT INTO ref_kelas (kode_kelas, nama_kelas, bidang, kapasitas) VALUES
-        ('TEK-01', 'Teknik Rekayasa Kelas A', 'TEKREK', 40),
-        ('TEK-02', 'Teknik Rekayasa Kelas B', 'TEKREK', 35),
-        ('SOS-01', 'Sosial Humaniora Kelas A', 'SOSHUM', 45),
-        ('SOS-02', 'Sosial Humaniora Kelas B', 'SOSHUM', 40)
-      `);
-    }
-
-    // Seed Jadwal Awal
-    const jadwalCheck = await db.query(`SELECT COUNT(*) as count FROM jadwal_kursus`);
-    if (Number((jadwalCheck.rows[0] as any).count) === 0) {
-      const today = new Date().toISOString().split('T')[0];
-      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-      await db.query(`
-        INSERT INTO jadwal_kursus (bidang, tanggal, sesi, npm, kelas, nama, status_entry, created_at, updated_at) VALUES
-        ('TEKREK', '${today}', 1, '2023101001', 'TEK-01', 'Budi Santoso', 'BARU', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ('TEKREK', '${today}', 2, '2023101002', 'TEK-02', 'Siti Rahmawati', 'BARU', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ('SOSHUM', '${today}', 3, '2023202001', 'SOS-01', 'Andi Pratama', 'BARU', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ('SOSHUM', '${tomorrow}', 1, '2023202002', 'SOS-02', 'Dewi Lestari', 'BARU', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        ('TEKREK', '${tomorrow}', 4, '2023101003', 'TEK-01', 'Rizky Firmansyah', 'BARU', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `);
-    }
-
-    // Seed Materi Awal (M1 s/d M10)
-    const materiCheck = await db.query(`SELECT COUNT(*) as count FROM materi_kursus`);
-    if (Number((materiCheck.rows[0] as any).count) === 0) {
-      await db.query(`
-        INSERT INTO materi_kursus (npm, nama, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10) VALUES
-        ('2023101001', 'Budi Santoso', 'Pengenalan Algoritma & Dasar Pemrograman', 'Variabel, Tipe Data, & Operator', 'Struktur Percabangan If-Else', 'Perulangan For & While', 'Fungsi & Prosedur Modular', 'Array 1D & 2D', 'Pointer & Alokasi Memori', 'Struktur Data Stack & Queue', 'Algoritma Sorting & Searching', 'Proyek Mini Solusi Algoritma'),
-        ('2023101002', 'Siti Rahmawati', 'Pengantar Basis Data Relasional', 'Perancangan ERD & Normalisasi 3NF', 'Data Definition Language (CREATE/ALTER)', 'Data Manipulation Language (INSERT/UPDATE)', 'Query SELECT & Klausa WHERE', 'Relasi Tabel & INNER/LEFT JOIN', 'Subquery & Database View', 'Stored Procedure & Function', 'Database Trigger & Indeks', 'Backup, Restore & Keamanan DB'),
-        ('2023202001', 'Andi Pratama', 'Komunikasi Bisnis & Interpersonal', 'Teknik Presentasi & Negosiasi', 'Etika Profesi & Tata Kelola Bisnis', 'Manajemen Organisasi & SDM', 'Riset Pasar & Analisis Konsumen', 'Strategi Pemasaran Digital', 'Kepemimpinan & Kerja Sama Tim', 'Perencanaan Rencana Bisnis Strategis', 'Evaluasi Kinerja & Manajemen Risiko', 'Presentasi Sidang Studi Kasus Akhir')
-      `);
-    }
-
-    // Seed Status Login Mahasiswa Awal
-    const statusLoginCheck = await db.query(`SELECT COUNT(*) as count FROM status_login_mahasiswa`);
-    if (Number((statusLoginCheck.rows[0] as any).count) === 0) {
-      await db.query(`
-        INSERT INTO status_login_mahasiswa (npm, kelas, sesi, tgl_login) VALUES
-        ('2023101001', 'TEK-01', 1, CURRENT_TIMESTAMP - INTERVAL '12 minutes'),
-        ('2023101002', 'TEK-02', 2, CURRENT_TIMESTAMP - INTERVAL '35 minutes'),
-        ('2023202001', 'SOS-01', 3, CURRENT_TIMESTAMP - INTERVAL '1 hour 20 minutes'),
-        ('2023202002', 'SOS-02', 1, CURRENT_TIMESTAMP - INTERVAL '2 hours 45 minutes'),
-        ('2023101003', 'TEK-01', 4, CURRENT_TIMESTAMP - INTERVAL '3 hours 10 minutes'),
-        ('2023101004', 'TEK-02', 2, CURRENT_TIMESTAMP - INTERVAL '5 hours 20 minutes'),
-        ('2023202003', 'SOS-01', 3, CURRENT_TIMESTAMP - INTERVAL '1 day 2 hours')
-      `);
-    }
-
-    console.log('[Database] Database tables and initial seed complete.');
+    // PERMINTAAN USER: Tidak ada pengisian data otomatis (auto-seed) saat aplikasi dibuild / dijalankan.
+    // Aplikasi murni mengikuti data yang sudah tersimpan di database PostgreSQL.
+    // Untuk inisiasi awal, admin dapat melakukan import skrip database.sql secara manual.
+    console.log('[Database] Database tables initialized. Automatic data seeding is disabled.');
     return db;
   } catch (err) {
     console.error('[Database] Initialization error:', err);
     throw err;
+  }
+}
+
+/**
+ * Inisiasi manual dari database.sql oleh admin
+ * Mengeksekusi seluruh DDL dan data awal yang ada di database.sql secara manual saat diminta
+ */
+export async function importDatabaseSql(): Promise<{ success: boolean; message: string }> {
+  try {
+    const sqlPath = path.join(process.cwd(), 'database.sql');
+    if (!fs.existsSync(sqlPath)) {
+      throw new Error('Berkas database.sql tidak ditemukan di server');
+    }
+    const sqlContent = fs.readFileSync(sqlPath, 'utf-8');
+    await db.query(sqlContent);
+    console.log('[Database] Skrip database.sql berhasil dieksekusi secara manual.');
+    return {
+      success: true,
+      message: 'Skrip database.sql berhasil diimport secara manual ke database PostgreSQL!',
+    };
+  } catch (err: any) {
+    console.error('[Database] Gagal mengeksekusi database.sql:', err);
+    throw new Error('Gagal mengeksekusi database.sql: ' + (err.message || String(err)));
   }
 }
 
