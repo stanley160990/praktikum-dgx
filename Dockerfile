@@ -30,9 +30,8 @@ ENV PORT=3000
 COPY package.json ./
 RUN npm install --omit=dev
 
-# Salin hasil build dari stage builder
+# Salin hasil build dari stage builder (aset statis frontend & bundle backend berada di dist)
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
 COPY --from=builder /app/database.sql ./database.sql
 
 # Buat folder penyimpanan data lokal jika diperlukan
