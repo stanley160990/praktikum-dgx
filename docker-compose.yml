@@ -1,16 +1,14 @@
 # ============================================================
 # Docker Compose: Sistem Pengelolaan Jadwal & Akun Kursus Mahasiswa
-# Layanan Aktif: Web App (Node.js Express + React Vite)
-# Catatan: Database PostgreSQL telah disediakan di server terpisah.
-# Layanan postgres & pgadmin dinonaktifkan (diberi komentar).
+# Konfigurasi untuk Database Eksternal (PostgreSQL Eksisting)
 # ============================================================
 
 version: '3.8'
 
 services:
   # ------------------------------------------------------------
-  # 1. WEB APPLICATION: React + Node.js Express Fullstack
-  # Terhubung ke server database PostgreSQL yang telah disediakan
+  # WEB APPLICATION: React + Node.js Express Fullstack
+  # Terhubung langsung ke Database PostgreSQL Eksternal yang sudah ada
   # ------------------------------------------------------------
   app:
     build:
@@ -22,7 +20,8 @@ services:
       PORT: 3000
       NODE_ENV: production
       DB_DRIVER: ${DB_DRIVER:-pg}
-      DB_HOST: ${DB_HOST:-localhost}
+      # Arahkan ke nama container database eksternal Anda atau IP/hostname server database:
+      DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-db_kursus_mahasiswa}
       DB_USER: ${DB_USER:-postgres}
@@ -30,81 +29,27 @@ services:
       DB_SSL: ${DB_SSL:-false}
     ports:
       - "3000:3000"
-    # Jika menghubungkan ke PostgreSQL di host mesin fisik yang sama dari dalam Docker:
-    # extra_hosts:
-    #   - "host.docker.internal:host-gateway"
-    # depends_on:
-    #   postgres:
-    #     condition: service_healthy
     volumes:
       - app_data:/app/data
     networks:
       - kursus_network
 
-  # ============================================================
-  # BAGIAN DATABASE POSTGRESQL & PGADMIN (DINONAKTIFKAN / DIKOMENTARI)
-  # Database PostgreSQL telah disediakan secara terpisah di luar Docker ini.
-  # Jika di masa mendatang Anda ingin menjalankan PostgreSQL atau pgAdmin lokal
-  # secara otomatis di Docker, cukup hapus tanda pagar (#) pada baris berikut.
-  # ============================================================
-
-  # ------------------------------------------------------------
-  # 2. DATABASE: PostgreSQL 16 (Diberi komentar / Dinonaktifkan)
-  # Skema & data awal diinisialisasi otomatis via database.sql
-  # ------------------------------------------------------------
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: db_kursus_postgres
-  #   restart: unless-stopped
-  #   environment:
-  #     POSTGRES_DB: ${DB_NAME:-db_kursus_mahasiswa}
-  #     POSTGRES_USER: ${DB_USER:-postgres}
-  #     POSTGRES_PASSWORD: ${DB_PASS:-postgres123}
-  #     PGDATA: /var/lib/postgresql/data/pgdata
-  #   ports:
-  #     - "${DB_PORT:-5432}:5432"
-  #   volumes:
-  #     # Skrip database.sql otomatis dieksekusi saat container pertama kali dibuat
-  #     - ./database.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-db_kursus_mahasiswa}"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-  #   networks:
-  #     - kursus_network
-
-  # ------------------------------------------------------------
-  # 3. DATABASE GUI: pgAdmin 4 (Diberi komentar / Dinonaktifkan)
-  # Akses melalui: http://localhost:5050
-  # Login: admin@kursus.local / admin123
-  # ------------------------------------------------------------
-  # pgadmin:
-  #   image: dpage/pgadmin4:latest
-  #   container_name: pgadmin_kursus
-  #   restart: unless-stopped
-  #   environment:
-  #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@kursus.local}
-  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
-  #     PGADMIN_CONFIG_SERVER_MODE: 'False'
-  #   ports:
-  #     - "5050:80"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   networks:
-  #     - kursus_network
-
 # ------------------------------------------------------------
 # NETWORKS & VOLUMES
 # ------------------------------------------------------------
 networks:
+  # Hubungkan container app ke network tempat database PostgreSQL Anda berada.
+  # Jika network sudah dibuat sebelumnya di Docker (misal oleh container database eksisting Anda),
+  # Anda dapat mengaktifkan 'external: true' di bawah:
   kursus_network:
     driver: bridge
+    # external: true  # <--- Aktifkan ini jika network 'kursus_network' sudah ada di Docker Anda
 
 volumes:
   app_data:
     driver: local
-  # postgres_data:
-  #   driver: local
+
+# Catatan:
+# Karena menggunakan Database PostgreSQL Eksternal, service 'postgres', variabel 'PGDATA',
+# dan volume 'postgres_data' TIDAK DIPERLUKAN LAGI sehingga tidak ada instance database baru
+# yang dibuat dan data murni membaca dari database eksisting Anda.
