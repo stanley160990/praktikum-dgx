@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { createServer as createViteServer } from 'vite';
 
@@ -70,7 +71,7 @@ app.post('/api/database/import-sql', async (req, res) => {
   }
 });
 
-// 2. Admin Login (SQL Query verification)
+// 2. Admin Login (SQL Query verification with SHA1 password hashing)
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -78,7 +79,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Username dan password wajib diisi!' });
     }
 
-    // Direct SQL Query as required: "Login menggunakan username dan password dengan melakukan query ke database SQL"
+    // Direct SQL Query: Login menggunakan username dan verifikasi password di database SQL
     const query = 'SELECT id, username, password, nama_lengkap FROM admin_users WHERE username = $1 LIMIT 1';
     const result = await db.query(query, [username]);
 
@@ -93,9 +94,28 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = result.rows[0] as any;
-    // Password check (supports admin123 or matches)
-    if (user.password !== password && password !== 'admin123') {
+
+    // Enkripsi password yang diinputkan menggunakan algoritma SHA1 (heksadesimal 40 karakter)
+    const hashedInput = crypto.createHash('sha1').update(password).digest('hex');
+
+    // Cek kecocokan password:
+    // 1. Password di database sudah berupa hash SHA1 (standar keamanan)
+    // 2. Dukungan transisi bila database eksisting sebelumnya masih menyimpan plain-text
+    const isSha1Match = user.password && user.password.toLowerCase() === hashedInput.toLowerCase();
+    const isLegacyPlaintextMatch = user.password === password;
+
+    if (!isSha1Match && !isLegacyPlaintextMatch) {
       return res.status(401).json({ success: false, message: 'Password salah!' });
+    }
+
+    // Jika database eksisting lama masih menyimpan format plain-text, otomatis migrasikan ke SHA1
+    if (isLegacyPlaintextMatch && !isSha1Match) {
+      try {
+        await db.query('UPDATE admin_users SET password = $1 WHERE id = $2', [hashedInput, user.id]);
+        console.log(`[Auth] Password admin '${username}' berhasil dimigrasikan dari plain-text ke hash SHA1.`);
+      } catch (updateErr) {
+        console.error('[Auth] Peringatan: Gagal memigrasikan password ke SHA1:', updateErr);
+      }
     }
 
     return res.json({
@@ -111,6 +131,47 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err: any) {
     console.error('Login error:', err);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan pada database SQL: ' + err.message });
+  }
+});
+
+// 2b. Admin Ubah Password (Menyimpan Password Baru dalam format SHA1)
+app.post('/api/auth/change-password', async (req, res) => {
+  try {
+    const { username, oldPassword, newPassword } = req.body;
+    if (!username || !oldPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Username, password lama, dan password baru wajib diisi!' });
+    }
+
+    if (newPassword.length < 5) {
+      return res.status(400).json({ success: false, message: 'Password baru minimal 5 karakter!' });
+    }
+
+    const query = 'SELECT id, username, password FROM admin_users WHERE username = $1 LIMIT 1';
+    const result = await db.query(query, [username]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pengguna admin tidak ditemukan!' });
+    }
+
+    const user = result.rows[0] as any;
+    const oldHashed = crypto.createHash('sha1').update(oldPassword).digest('hex');
+    const isOldMatch = (user.password && user.password.toLowerCase() === oldHashed.toLowerCase()) || user.password === oldPassword;
+
+    if (!isOldMatch) {
+      return res.status(401).json({ success: false, message: 'Password lama tidak sesuai!' });
+    }
+
+    // Hash password baru dengan SHA1
+    const newHashed = crypto.createHash('sha1').update(newPassword).digest('hex');
+    await db.query('UPDATE admin_users SET password = $1 WHERE id = $2', [newHashed, user.id]);
+
+    return res.json({
+      success: true,
+      message: 'Password berhasil diperbarui dan disimpan dalam format SHA1!',
+    });
+  } catch (err: any) {
+    console.error('Change password error:', err);
+    res.status(500).json({ success: false, message: 'Gagal memperbarui password: ' + err.message });
   }
 });
 

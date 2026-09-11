@@ -251,7 +251,11 @@ export async function importDatabaseSql(): Promise<{ success: boolean; message: 
       throw new Error('Berkas database.sql tidak ditemukan di server');
     }
     const sqlContent = fs.readFileSync(sqlPath, 'utf-8');
-    await db.query(sqlContent);
+    if (typeof (db as any).exec === 'function') {
+      await (db as any).exec(sqlContent);
+    } else {
+      await db.query(sqlContent);
+    }
     console.log('[Database] Skrip database.sql berhasil dieksekusi secara manual.');
     return {
       success: true,

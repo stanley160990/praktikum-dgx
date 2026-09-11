@@ -11,11 +11,12 @@
 -- ------------------------------------------------------------
 -- 1. TABEL: admin_users
 -- Pengguna dengan peran Administrator utama untuk login
+-- Kolom password menyimpan hash SHA1 (40 karakter heksadesimal)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admin_users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL, -- Format enkripsi hash SHA1
     nama_lengkap VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -118,9 +119,11 @@ CREATE INDEX IF NOT EXISTS idx_status_login_tgl ON status_login_mahasiswa(tgl_lo
 -- ============================================================
 
 -- 1. Akun Admin Default: admin / admin123
+-- Password 'admin123' disimpan dalam format enkripsi hash SHA1:
+-- SHA1('admin123') = 'f865b53623b121fd34ee5426c792e5c33af8c227'
 INSERT INTO admin_users (username, password, nama_lengkap) 
-VALUES ('admin', 'admin123', 'Administrator Utama')
-ON CONFLICT (username) DO NOTHING;
+VALUES ('admin', 'f865b53623b121fd34ee5426c792e5c33af8c227', 'Administrator Utama')
+ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password;
 
 -- 2. Referensi Sesi (Sesi 1 s/d Sesi 4)
 INSERT INTO ref_sesi (nomor_sesi, nama_sesi, waktu_mulai, waktu_selesai, keterangan) VALUES

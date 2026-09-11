@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Lock, User, ShieldAlert, CheckCircle2, KeyRound, Database, RefreshCw } from 'lucide-react';
+import { Lock, User, ShieldAlert, CheckCircle2, KeyRound, Database, RefreshCw, Clock } from 'lucide-react';
 import { AdminUser } from '../types';
 
 interface AdminLoginProps {
   onLoginSuccess: (user: AdminUser) => void;
+  sessionTimeoutMessage?: string | null;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({
   onLoginSuccess,
+  sessionTimeoutMessage,
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -93,6 +95,16 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
         {/* Form Body */}
         <div className="p-8">
+          {sessionTimeoutMessage && (
+            <div className="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-2.5 shadow-xs animate-in fade-in duration-200">
+              <Clock className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <span className="font-bold block text-amber-900 mb-0.5">Sesi Berakhir Otomatis</span>
+                <span className="text-xs text-amber-800 leading-relaxed">{sessionTimeoutMessage}</span>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
               <div className="flex items-start gap-2">

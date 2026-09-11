@@ -13,12 +13,22 @@ import { AdminLogin } from './components/AdminLogin';
 import { AdminUser, JadwalKursus, MateriKursus, RefSesi, RefKelas } from './types';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
+// Durasi otomatis logout saat tidak ada aksi (15 menit = 900.000 ms)
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+
 export default function App() {
   // Admin auth state (default null so the landing page is Login, not logged in by default)
   const [admin, setAdmin] = useState<AdminUser | null>(() => {
     const saved = sessionStorage.getItem('sim_admin_user');
     if (saved) {
       try {
+        const lastActive = Number(sessionStorage.getItem('sim_admin_last_activity'));
+        if (lastActive && Date.now() - lastActive >= INACTIVITY_TIMEOUT_MS) {
+          sessionStorage.removeItem('sim_admin_user');
+          sessionStorage.removeItem('sim_admin_last_activity');
+          sessionStorage.removeItem('sim_admin_login_time');
+          return null;
+        }
         return JSON.parse(saved);
       } catch (e) {
         return null;
@@ -29,13 +39,100 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<string>(() => {
     const saved = sessionStorage.getItem('sim_admin_user');
-    return saved ? 'dashboard' : 'login';
+    const lastActive = Number(sessionStorage.getItem('sim_admin_last_activity'));
+    if (saved && lastActive && Date.now() - lastActive < INACTIVITY_TIMEOUT_MS) {
+      return 'dashboard';
+    }
+    return 'login';
   });
+
+  const [sessionTimeoutMessage, setSessionTimeoutMessage] = useState<string | null>(() => {
+    const lastActive = Number(sessionStorage.getItem('sim_admin_last_activity'));
+    const hadUser = sessionStorage.getItem('sim_admin_user');
+    if (hadUser && lastActive && Date.now() - lastActive >= INACTIVITY_TIMEOUT_MS) {
+      return 'Sesi Anda telah berakhir otomatis karena tidak ada aktivitas selama 15 menit demi keamanan.';
+    }
+    return null;
+  });
+
+  const lastActivityRef = React.useRef<number>(Date.now());
 
   // Hapus sisa sesi login lama di localStorage agar default selalu halaman login
   useEffect(() => {
     localStorage.removeItem('sim_admin_user');
   }, []);
+
+  // Mekanisme Otomatis Logout Setelah 15 Menit Tanpa Aktivitas
+  useEffect(() => {
+    if (!admin) return;
+
+    // Inisiasi waktu aktivitas awal
+    const stored = Number(sessionStorage.getItem('sim_admin_last_activity'));
+    const initialTime = stored && !isNaN(stored) ? stored : Date.now();
+    lastActivityRef.current = initialTime;
+    sessionStorage.setItem('sim_admin_last_activity', String(initialTime));
+
+    const checkInactivity = () => {
+      const now = Date.now();
+      const lastActive = Number(sessionStorage.getItem('sim_admin_last_activity')) || lastActivityRef.current;
+      if (now - lastActive >= INACTIVITY_TIMEOUT_MS) {
+        // Eksekusi auto logout
+        setAdmin(null);
+        sessionStorage.removeItem('sim_admin_user');
+        sessionStorage.removeItem('sim_admin_last_activity');
+        sessionStorage.removeItem('sim_admin_login_time');
+        localStorage.removeItem('sim_admin_user');
+        setActiveTab('login');
+        setSessionTimeoutMessage('Sesi Anda telah berakhir otomatis karena tidak ada aktivitas selama 15 menit demi keamanan data. Silakan login kembali.');
+        showToast('Sesi otomatis berakhir (tidak ada aksi selama 15 menit)', 'error');
+      }
+    };
+
+    // Handler interaksi pengguna dengan throttling 1 detik agar hemat resource
+    let throttleTimeout: any = null;
+    const recordUserActivity = () => {
+      if (throttleTimeout) return;
+      throttleTimeout = setTimeout(() => {
+        throttleTimeout = null;
+      }, 1000);
+
+      const now = Date.now();
+      lastActivityRef.current = now;
+      sessionStorage.setItem('sim_admin_last_activity', String(now));
+    };
+
+    // Daftarkan event listener untuk seluruh jenis aksi pengguna di halaman website
+    const userEvents = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click', 'wheel'];
+    userEvents.forEach((event) => {
+      window.addEventListener(event, recordUserActivity, { passive: true });
+    });
+
+    // Segera periksa jika tab browser kembali dibuka / difokuskan
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        checkInactivity();
+      }
+    };
+    const handleWindowFocus = () => {
+      checkInactivity();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+
+    // Interval rutin setiap 5 detik untuk memverifikasi batas 15 menit
+    const intervalId = setInterval(checkInactivity, 5000);
+
+    return () => {
+      userEvents.forEach((event) => {
+        window.removeEventListener(event, recordUserActivity);
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+      clearInterval(intervalId);
+      if (throttleTimeout) clearTimeout(throttleTimeout);
+    };
+  }, [admin]);
   const [jadwalList, setJadwalList] = useState<JadwalKursus[]>([]);
   const [materiList, setMateriList] = useState<MateriKursus[]>([]);
   const [sesiList, setSesiList] = useState<RefSesi[]>([]);
@@ -104,6 +201,8 @@ export default function App() {
   const handleLoginSuccess = (user: AdminUser) => {
     setAdmin(user);
     sessionStorage.setItem('sim_admin_user', JSON.stringify(user));
+    sessionStorage.setItem('sim_admin_last_activity', String(Date.now()));
+    setSessionTimeoutMessage(null);
     setActiveTab('dashboard');
     showToast(`Selamat datang kembali, ${user.nama_lengkap}!`);
   };
@@ -111,7 +210,10 @@ export default function App() {
   const handleLogout = () => {
     setAdmin(null);
     sessionStorage.removeItem('sim_admin_user');
+    sessionStorage.removeItem('sim_admin_last_activity');
+    sessionStorage.removeItem('sim_admin_login_time');
     localStorage.removeItem('sim_admin_user');
+    setSessionTimeoutMessage(null);
     setActiveTab('login');
     showToast('Anda telah keluar dari akun admin.');
   };
@@ -282,6 +384,7 @@ export default function App() {
           {!admin ? (
             <AdminLogin
               onLoginSuccess={handleLoginSuccess}
+              sessionTimeoutMessage={sessionTimeoutMessage}
             />
           ) : activeTab === 'dashboard' ? (
             <DashboardView
