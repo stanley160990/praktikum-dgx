@@ -66,7 +66,7 @@ export function parseExcelFile(file: File): Promise<ExcelRow[]> {
           }
 
           let sesi = parseInt(String(findVal(['sesi', 'session', 'sesi_ke'])), 10);
-          if (isNaN(sesi) || sesi < 1 || sesi > 4) sesi = 1;
+          if (isNaN(sesi) || sesi < 1) sesi = 1;
 
           const npm = String(findVal(['npm', 'nim', 'nomor_pokok', 'id_mahasiswa'])).trim();
           const kelas = String(findVal(['kelas', 'class', 'kode_kelas'])).trim();

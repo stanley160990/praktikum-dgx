@@ -261,10 +261,22 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
               className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white outline-none focus:border-[#525FE1]"
             >
               <option value="all">Semua Sesi</option>
-              <option value="1">Sesi 1</option>
-              <option value="2">Sesi 2</option>
-              <option value="3">Sesi 3</option>
-              <option value="4">Sesi 4</option>
+              {sesiList && sesiList.length > 0 ? (
+                [...sesiList]
+                  .sort((a, b) => a.nomor_sesi - b.nomor_sesi)
+                  .map((s) => (
+                    <option key={s.id || s.nomor_sesi} value={String(s.nomor_sesi)}>
+                      {s.nama_sesi || `Sesi ${s.nomor_sesi}`} ({s.waktu_mulai} - {s.waktu_selesai})
+                    </option>
+                  ))
+              ) : (
+                <>
+                  <option value="1">Sesi 1</option>
+                  <option value="2">Sesi 2</option>
+                  <option value="3">Sesi 3</option>
+                  <option value="4">Sesi 4</option>
+                </>
+              )}
             </select>
           </div>
 

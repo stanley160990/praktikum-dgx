@@ -38,6 +38,9 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
   onOpenUploadModal,
   onNavigateToUpload,
 }) => {
+  // Sort sesiList by nomor_sesi ascending
+  const sortedSesiList = [...sesiList].sort((a, b) => a.nomor_sesi - b.nomor_sesi);
+
   // Search and Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBidang, setFilterBidang] = useState('');
@@ -93,10 +96,11 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
   };
 
   const handleOpenAddModal = () => {
+    const defaultSesi = sortedSesiList.length > 0 ? sortedSesiList[0].nomor_sesi : 1;
     setFormData({
       bidang: 'TEKREK',
       tanggal: new Date().toISOString().split('T')[0],
-      sesi: 1,
+      sesi: defaultSesi,
       npm: '',
       kelas: kelasList.find((k) => k.bidang === 'TEKREK')?.kode_kelas || '3IA01',
       nama: '',
@@ -219,6 +223,7 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
 
             {/* Filter Sesi dropdown */}
             <select
+              id="filter-sesi-jadwal"
               value={filterSesi}
               onChange={(e) => {
                 setFilterSesi(e.target.value);
@@ -227,10 +232,20 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
               className="py-2 px-3 border border-gray-300 rounded text-sm bg-white text-gray-700 outline-none"
             >
               <option value="">Semua Sesi</option>
-              <option value="1">Sesi 1</option>
-              <option value="2">Sesi 2</option>
-              <option value="3">Sesi 3</option>
-              <option value="4">Sesi 4</option>
+              {sortedSesiList.length > 0 ? (
+                sortedSesiList.map((s) => (
+                  <option key={s.id || s.nomor_sesi} value={String(s.nomor_sesi)}>
+                    {s.nama_sesi || `Sesi ${s.nomor_sesi}`} ({s.waktu_mulai} - {s.waktu_selesai})
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="1">Sesi 1</option>
+                  <option value="2">Sesi 2</option>
+                  <option value="3">Sesi 3</option>
+                  <option value="4">Sesi 4</option>
+                </>
+              )}
             </select>
 
             {/* Search input with rounded-full icon matching design */}
@@ -433,29 +448,60 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Sesi Perkuliahan</label>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    Sesi Perkuliahan <span className="text-red-500">*</span>
+                  </label>
                   <select
+                    id="select-modal-sesi"
                     value={formData.sesi}
                     onChange={(e) => setFormData({ ...formData, sesi: Number(e.target.value) })}
-                    className="w-full p-2.5 rounded-lg border border-gray-300 outline-none focus:border-[#525FE1]"
+                    className="w-full p-2.5 rounded-lg border border-gray-300 outline-none focus:border-[#525FE1] text-gray-800"
                   >
-                    <option value={1}>Sesi 1 (08:00 - 10:00)</option>
-                    <option value={2}>Sesi 2 (10:15 - 12:15)</option>
-                    <option value={3}>Sesi 3 (13:00 - 15:00)</option>
-                    <option value={4}>Sesi 4 (15:15 - 17:15)</option>
+                    {sortedSesiList.length > 0 ? (
+                      sortedSesiList.map((s) => (
+                        <option key={s.id || s.nomor_sesi} value={s.nomor_sesi}>
+                          {s.nama_sesi || `Sesi ${s.nomor_sesi}`} ({s.waktu_mulai} - {s.waktu_selesai})
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value={1}>Sesi 1 (08:00 - 10:00)</option>
+                        <option value={2}>Sesi 2 (10:15 - 12:15)</option>
+                        <option value={3}>Sesi 3 (13:00 - 15:00)</option>
+                        <option value={4}>Sesi 4 (15:15 - 17:15)</option>
+                      </>
+                    )}
+                    {/* Jika sedang edit data lama yang nomor sesinya tidak ada di referensi saat ini */}
+                    {formData.sesi && !sortedSesiList.some((s) => s.nomor_sesi === formData.sesi) && (
+                      <option value={formData.sesi}>
+                        Sesi {formData.sesi} (Sesi Tersimpan)
+                      </option>
+                    )}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Kelas</label>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    Kelas <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     required
+                    list="list-kelas-options"
                     value={formData.kelas}
                     onChange={(e) => setFormData({ ...formData, kelas: e.target.value })}
                     placeholder="Contoh: 3IA01"
                     className="w-full p-2.5 rounded-lg border border-gray-300 outline-none focus:border-[#525FE1] font-mono"
                   />
+                  <datalist id="list-kelas-options">
+                    {kelasList
+                      .filter((k) => !formData.bidang || k.bidang === formData.bidang)
+                      .map((k) => (
+                        <option key={k.id || k.kode_kelas} value={k.kode_kelas}>
+                          {k.kode_kelas} - {k.nama_kelas}
+                        </option>
+                      ))}
+                  </datalist>
                 </div>
               </div>
 

@@ -371,10 +371,22 @@ export const LiveStatusLoginView: React.FC<LiveStatusLoginViewProps> = ({
               className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white outline-none focus:border-[#525FE1]"
             >
               <option value="all">Semua Sesi Hari Ini</option>
-              <option value="1">Sesi 1 (07:30 - 09:30)</option>
-              <option value="2">Sesi 2 (09:30 - 11:30)</option>
-              <option value="3">Sesi 3 (13:30 - 15:30)</option>
-              <option value="4">Sesi 4 (15:30 - 17:30)</option>
+              {sesiList && sesiList.length > 0 ? (
+                [...sesiList]
+                  .sort((a, b) => a.nomor_sesi - b.nomor_sesi)
+                  .map((s) => (
+                    <option key={s.id || s.nomor_sesi} value={String(s.nomor_sesi)}>
+                      {s.nama_sesi || `Sesi ${s.nomor_sesi}`} ({s.waktu_mulai} - {s.waktu_selesai})
+                    </option>
+                  ))
+              ) : (
+                <>
+                  <option value="1">Sesi 1 (08:00 - 10:00)</option>
+                  <option value="2">Sesi 2 (10:15 - 12:15)</option>
+                  <option value="3">Sesi 3 (13:00 - 15:00)</option>
+                  <option value="4">Sesi 4 (15:15 - 17:15)</option>
+                </>
+              )}
             </select>
           </div>
 
