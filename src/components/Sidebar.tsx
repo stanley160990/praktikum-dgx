@@ -60,9 +60,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-6 text-xl font-bold border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-md bg-white/20 flex items-center justify-center text-white font-black text-xs border border-white/30">
-              K
+              H
             </div>
-            <span className="tracking-tight">KURSUSTIK ADMIN</span>
+            <span className="tracking-tight">HPC-UG</span>
           </div>
 
           <button 
@@ -73,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Action Button: Upload Jadwal Popup */}
+        {/* Action Button: Upload Jadwal */}
         <div className="px-4 pt-4 pb-2">
           <button
             id="btn-sidebar-upload-jadwal-popup"
@@ -84,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-white text-[#525FE1] hover:bg-indigo-50 rounded-lg text-xs font-bold shadow-xs transition active:scale-98"
           >
             <Upload className="w-4 h-4" />
-            <span>Upload Jadwal (Popup)</span>
+            <span>Upload Jadwal</span>
           </button>
         </div>
 
@@ -196,29 +196,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className={`w-5 h-5 flex items-center justify-center rounded-sm ${activeTab === 'jadwal' ? 'text-white' : 'text-white/80'}`}>
               <Table className="w-4 h-4" />
             </div>
-            <span>Data Jadwal Mahasiswa</span>
+            <span>Jadwal Mahasiswa</span>
           </button>
 
-          {/* Data Archive */}
-          <button
-            id="nav-item-archive"
-            onClick={() => {
-              setActiveTab('archive');
-              setIsOpenMobile(false);
-            }}
-            className={`w-full flex items-center space-x-3 p-3 rounded-lg text-sm font-medium transition text-left ${
-              activeTab === 'archive'
-                ? 'bg-white/15 text-white shadow-xs font-semibold' 
-                : 'text-white/70 hover:text-white hover:bg-white/5 opacity-85 hover:opacity-100'
-            }`}
-          >
-            <div className={`w-5 h-5 flex items-center justify-center rounded-sm ${activeTab === 'archive' ? 'text-white' : 'text-white/80'}`}>
-              <Archive className="w-4 h-4" />
-            </div>
-            <span>Data Archive</span>
-          </button>
-
-          {/* Materi */}
+          {/* Materi Mahasiswa */}
           <button
             id="nav-item-materi"
             onClick={() => {
@@ -234,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className={`w-5 h-5 flex items-center justify-center rounded-sm ${activeTab === 'materi' ? 'text-white' : 'text-white/80'}`}>
               <BookOpen className="w-4 h-4" />
             </div>
-            <span>Data Materi (M1 - M10)</span>
+            <span>Materi Mahasiswa</span>
           </button>
 
           {/* Referensi */}
@@ -254,6 +235,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Layers className="w-4 h-4" />
             </div>
             <span>Referensi Sesi & Kelas</span>
+          </button>
+
+          {/* Data Archive - Urutan paling bawah */}
+          <button
+            id="nav-item-archive"
+            onClick={() => {
+              setActiveTab('archive');
+              setIsOpenMobile(false);
+            }}
+            className={`w-full flex items-center space-x-3 p-3 rounded-lg text-sm font-medium transition text-left ${
+              activeTab === 'archive'
+                ? 'bg-white/15 text-white shadow-xs font-semibold' 
+                : 'text-white/70 hover:text-white hover:bg-white/5 opacity-85 hover:opacity-100'
+            }`}
+          >
+            <div className={`w-5 h-5 flex items-center justify-center rounded-sm ${activeTab === 'archive' ? 'text-white' : 'text-white/80'}`}>
+              <Archive className="w-4 h-4" />
+            </div>
+            <span>Data Archive</span>
           </button>
         </nav>
 

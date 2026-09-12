@@ -354,14 +354,14 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onNavigateToJadwal }) 
                       </div>
                       <p className="font-bold text-gray-800 text-sm">Belum Ada Data Mahasiswa yang Di-archive</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        Data archive dihasilkan saat Anda menekan tombol <b>Archive Semester</b> di menu <b>Data Jadwal Mahasiswa</b>.
+                        Data archive dihasilkan saat Anda menekan tombol <b>Archive Semester</b> di menu <b>Jadwal Mahasiswa</b>.
                       </p>
                       {onNavigateToJadwal && (
                         <button
                           onClick={onNavigateToJadwal}
                           className="mt-4 px-4 py-2 bg-[#525FE1] text-white text-xs font-bold rounded-lg shadow-xs hover:bg-[#434ebc] transition"
                         >
-                          Buka Data Jadwal Mahasiswa
+                          Buka Jadwal Mahasiswa
                         </button>
                       )}
                     </div>

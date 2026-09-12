@@ -95,11 +95,11 @@ export const Header: React.FC<HeaderProps> = ({
       case 'dashboard':
         return 'Kelola Akun Kursus Mahasiswa';
       case 'jadwal':
-        return 'Data Tabel Jadwal Mahasiswa';
+        return 'Jadwal Mahasiswa';
       case 'archive':
         return 'Data Archive Mahasiswa';
       case 'materi':
-        return 'Data Tabel Materi Mahasiswa (M1 s/d M10)';
+        return 'Materi Mahasiswa';
       case 'status-login-live':
         return 'Live Status Login Mahasiswa (Hari Ini)';
       case 'status-login':

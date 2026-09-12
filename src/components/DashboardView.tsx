@@ -98,14 +98,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="px-4 py-2 bg-white/15 text-white border border-white/20 text-sm font-medium rounded shadow-sm hover:bg-white/25 flex items-center gap-2 transition"
           >
             <Layers className="w-4 h-4" />
-            Data Materi (M1-M10)
+            Materi Mahasiswa
           </button>
           <button
             onClick={() => onNavigate('jadwal')}
             className="px-4 py-2 bg-white/15 text-white border border-white/20 text-sm font-medium rounded shadow-sm hover:bg-white/25 flex items-center gap-2 transition"
           >
             <Table className="w-4 h-4" />
-            Data Jadwal
+            Jadwal Mahasiswa
           </button>
         </div>
       </div>
