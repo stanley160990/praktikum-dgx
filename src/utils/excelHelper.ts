@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { JadwalKursus, MateriKursus } from '../types';
+import { JadwalKursus, MateriKursus, JadwalKursusArchive } from '../types';
 
 export interface ExcelRow {
   Bidang: string;
@@ -289,6 +289,24 @@ export function exportMateriToExcel(data: MateriKursus[], filename = 'Data_Mater
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Materi_Fakultas');
+
+  XLSX.writeFile(workbook, filename);
+}
+
+export function exportArchiveToExcel(data: JadwalKursusArchive[], filename = 'Data_Mahasiswa_Archive.xlsx') {
+  const rows = data.map((d, index) => ({
+    No: index + 1,
+    NPM: d.npm,
+    'Nama Mahasiswa': d.nama_mahasiswa,
+    Kelas: d.kelas,
+    Sesi: d.sesi,
+    'Nama Semester': d.nama_semester,
+    'Waktu Archive': d.archived_at ? new Date(d.archived_at).toLocaleString('id-ID') : '-',
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data_Archive');
 
   XLSX.writeFile(workbook, filename);
 }

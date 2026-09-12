@@ -6,6 +6,7 @@ import { JadwalTableView } from './components/JadwalTableView';
 import { UploadExcelView } from './components/UploadExcelView';
 import { UploadJadwalModal } from './components/UploadJadwalModal';
 import { MateriTableView } from './components/MateriTableView';
+import { ArchiveView } from './components/ArchiveView';
 import { ReferensiView } from './components/ReferensiView';
 import { StatusLoginMahasiswaView } from './components/StatusLoginMahasiswaView';
 import { LiveStatusLoginView } from './components/LiveStatusLoginView';
@@ -427,6 +428,11 @@ export default function App() {
               onDelete={handleDelete}
               onOpenUploadModal={() => setUploadJadwalModalOpen(true)}
               onNavigateToUpload={() => setUploadJadwalModalOpen(true)}
+              onNavigateToArchive={() => setActiveTab('archive')}
+            />
+          ) : activeTab === 'archive' ? (
+            <ArchiveView
+              onNavigateToJadwal={() => setActiveTab('jadwal')}
             />
           ) : activeTab === 'materi' ? (
             <MateriTableView

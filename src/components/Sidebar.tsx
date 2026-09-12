@@ -12,7 +12,8 @@ import {
   Radio,
   History,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Archive
 } from 'lucide-react';
 import { AdminUser, RefSesi } from '../types';
 
@@ -196,6 +197,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Table className="w-4 h-4" />
             </div>
             <span>Data Jadwal Mahasiswa</span>
+          </button>
+
+          {/* Data Archive */}
+          <button
+            id="nav-item-archive"
+            onClick={() => {
+              setActiveTab('archive');
+              setIsOpenMobile(false);
+            }}
+            className={`w-full flex items-center space-x-3 p-3 rounded-lg text-sm font-medium transition text-left ${
+              activeTab === 'archive'
+                ? 'bg-white/15 text-white shadow-xs font-semibold' 
+                : 'text-white/70 hover:text-white hover:bg-white/5 opacity-85 hover:opacity-100'
+            }`}
+          >
+            <div className={`w-5 h-5 flex items-center justify-center rounded-sm ${activeTab === 'archive' ? 'text-white' : 'text-white/80'}`}>
+              <Archive className="w-4 h-4" />
+            </div>
+            <span>Data Archive</span>
           </button>
 
           {/* Materi */}

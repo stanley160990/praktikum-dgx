@@ -365,6 +365,22 @@ export async function initDatabase(): Promise<DatabaseClient> {
     await db.query(`CREATE INDEX IF NOT EXISTS idx_status_login_npm ON status_login_mahasiswa(npm);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_status_login_tgl ON status_login_mahasiswa(tgl_login);`);
 
+    // 7. Tabel Arsip Jadwal Mahasiswa (Arsip per Semester)
+    // Berisi hanya: npm, kelas, nama_mahasiswa, sesi, dan nama semester
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS jadwal_kursus_archive (
+        id SERIAL PRIMARY KEY,
+        npm VARCHAR(50) NOT NULL,
+        kelas VARCHAR(50) NOT NULL,
+        nama_mahasiswa VARCHAR(255) NOT NULL,
+        sesi INT NOT NULL,
+        nama_semester VARCHAR(100) NOT NULL,
+        archived_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_archive_semester ON jadwal_kursus_archive(nama_semester);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_archive_npm ON jadwal_kursus_archive(npm);`);
+
     // TIDAK ADA AUTO-SEED DATA: Menjaga integritas data database eksisting pengguna
     console.log('[Database] Koneksi dan struktur tabel database siap. Mengikuti data riil yang ada.');
     return db;
@@ -435,14 +451,16 @@ export async function getDatabaseStatus() {
   }
 
   try {
-    const [adminRes, sesiRes, kelasRes, fakultasRes, jadwalRes, materiRes, statusLoginRes] = await Promise.all([
+    const [adminRes, sesiRes, kelasRes, fakultasRes, mingguRes, jadwalRes, materiRes, statusLoginRes, archiveRes] = await Promise.all([
       db.query(`SELECT COUNT(*) as count FROM admin_users`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM ref_sesi`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM ref_kelas`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM ref_fakultas`).catch(() => ({ rows: [{ count: 0 }] })),
+      db.query(`SELECT COUNT(*) as count FROM ref_minggu`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM jadwal_kursus`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM materi_kursus`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM status_login_mahasiswa`).catch(() => ({ rows: [{ count: 0 }] })),
+      db.query(`SELECT COUNT(*) as count FROM jadwal_kursus_archive`).catch(() => ({ rows: [{ count: 0 }] })),
     ]);
 
     const tables = [
@@ -453,17 +471,22 @@ export async function getDatabaseStatus() {
       },
       {
         name: 'jadwal_kursus',
-        description: 'Data jadwal mahasiswa hasil upload Excel (Bidang, Tanggal, Sesi, Fakultas, NPM, Kelas, Nama)',
+        description: 'Data jadwal mahasiswa aktif (Bidang, Tanggal, Sesi, Fakultas, Minggu, NPM, Kelas, Nama)',
         rowCount: Number((jadwalRes.rows[0] as any)?.count || 0),
       },
       {
+        name: 'jadwal_kursus_archive',
+        description: 'Data arsip jadwal mahasiswa per semester (NPM, Kelas, Nama Mahasiswa, Sesi, Nama Semester)',
+        rowCount: Number((archiveRes.rows[0] as any)?.count || 0),
+      },
+      {
         name: 'materi_kursus',
-        description: 'Data materi per mahasiswa (NPM, Nama, Materi M1 s/d M10)',
+        description: 'Data silabus materi per fakultas (Materi M1 s/d M10)',
         rowCount: Number((materiRes.rows[0] as any)?.count || 0),
       },
       {
         name: 'ref_sesi',
-        description: 'Referensi waktu dan jam sesi',
+        description: 'Referensi waktu dan jam sesi perkuliahan',
         rowCount: Number((sesiRes.rows[0] as any)?.count || 0),
       },
       {
@@ -475,6 +498,11 @@ export async function getDatabaseStatus() {
         name: 'ref_fakultas',
         description: 'Referensi daftar fakultas universitas (FTI, FIKTI, FTSP, dll)',
         rowCount: Number((fakultasRes.rows[0] as any)?.count || 0),
+      },
+      {
+        name: 'ref_minggu',
+        description: 'Referensi minggu perkuliahan (M1 sampai dengan M10)',
+        rowCount: Number((mingguRes.rows[0] as any)?.count || 0),
       },
       {
         name: 'admin_users',

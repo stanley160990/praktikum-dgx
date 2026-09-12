@@ -10,7 +10,10 @@ import {
   FileSpreadsheet,
   X,
   AlertTriangle,
-  Upload
+  Upload,
+  Archive,
+  CheckCircle2,
+  Calendar
 } from 'lucide-react';
 import { JadwalKursus, RefSesi, RefKelas, RefFakultas, RefMinggu } from '../types';
 import { exportJadwalToExcel } from '../utils/excelHelper';
@@ -27,6 +30,7 @@ interface JadwalTableViewProps {
   onDelete: (id: number) => Promise<boolean>;
   onOpenUploadModal?: () => void;
   onNavigateToUpload?: () => void;
+  onNavigateToArchive?: () => void;
 }
 
 export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
@@ -41,6 +45,7 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
   onDelete,
   onOpenUploadModal,
   onNavigateToUpload,
+  onNavigateToArchive,
 }) => {
   // Sort sesiList by nomor_sesi ascending
   const sortedSesiList = [...sesiList].sort((a, b) => a.nomor_sesi - b.nomor_sesi);
@@ -77,6 +82,54 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
 
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Archive Modal states
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [namaSemesterInput, setNamaSemesterInput] = useState('');
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archiveSuccessMsg, setArchiveSuccessMsg] = useState<string | null>(null);
+
+  const handleTriggerArchive = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setArchiveError(null);
+    if (!namaSemesterInput.trim()) {
+      setArchiveError('Nama semester wajib diisi untuk menandai data archive!');
+      return;
+    }
+
+    if (jadwalList.length === 0) {
+      setArchiveError('Tabel data jadwal saat ini masih kosong, tidak ada data untuk di-archive.');
+      return;
+    }
+
+    setArchiveLoading(true);
+    try {
+      const res = await fetch('/api/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nama_semester: namaSemesterInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Gagal melakukan proses archive.');
+      }
+      setArchiveSuccessMsg(data.message);
+      onRefresh();
+      setTimeout(() => {
+        setIsArchiveModalOpen(false);
+        setNamaSemesterInput('');
+        setArchiveSuccessMsg(null);
+        if (onNavigateToArchive) {
+          onNavigateToArchive();
+        }
+      }, 1500);
+    } catch (err: any) {
+      setArchiveError(err.message || 'Terjadi kesalahan sistem saat melakukan archive.');
+    } finally {
+      setArchiveLoading(false);
+    }
+  };
 
   // Filter logic
   const filteredData = jadwalList.filter((item) => {
@@ -216,6 +269,20 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
             >
               <Download className="w-4 h-4" />
               Export ({filteredData.length})
+            </button>
+
+            <button
+              id="btn-trigger-archive-jadwal"
+              onClick={() => {
+                setIsArchiveModalOpen(true);
+                setArchiveError(null);
+                setArchiveSuccessMsg(null);
+              }}
+              className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded shadow-sm transition flex items-center gap-1.5"
+              title="Pindahkan seluruh data pada tabel jadwal kursus ke archive semester"
+            >
+              <Archive className="w-4 h-4" />
+              Archive
             </button>
 
             <button
@@ -714,6 +781,134 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
                 Hapus Sekarang
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Archive Data Jadwal ke jadwal_kursus_archive */}
+      {isArchiveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between pb-3 border-b border-gray-100 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+                  <Archive className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Archive Data Mahasiswa</h3>
+                  <p className="text-xs text-gray-500">Pindahkan data jadwal ke arsip semester</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!archiveLoading) {
+                    setIsArchiveModalOpen(false);
+                    setArchiveError(null);
+                    setArchiveSuccessMsg(null);
+                  }
+                }}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {archiveSuccessMsg ? (
+              <div className="py-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-emerald-800">{archiveSuccessMsg}</p>
+                <p className="text-xs text-gray-500">Mengarahkan ke menu Data Archive...</p>
+              </div>
+            ) : (
+              <form onSubmit={handleTriggerArchive} className="space-y-4">
+                <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 space-y-1.5">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    Pemberitahuan Proses Archive:
+                  </p>
+                  <p className="text-amber-800 leading-relaxed">
+                    Seluruh <b>{jadwalList.length} data mahasiswa</b> pada tabel <code>jadwal_kursus</code> akan dipindahkan ke <code>jadwal_kursus_archive</code> dan ditandai dengan <b>Nama Semester</b> yang Anda tentukan di bawah.
+                  </p>
+                  <p className="text-amber-700 text-[11px]">
+                    Tabel data jadwal mahasiswa aktif akan dikosongkan agar siap untuk perkuliahan semester baru.
+                  </p>
+                </div>
+
+                {archiveError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                    <span>{archiveError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Nama Semester <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="input-nama-semester-archive"
+                    type="text"
+                    required
+                    value={namaSemesterInput}
+                    onChange={(e) => setNamaSemesterInput(e.target.value)}
+                    placeholder="Contoh: Semester Ganjil 2024/2025"
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-xs text-gray-900 outline-none focus:border-[#525FE1] focus:ring-1 focus:ring-[#525FE1]"
+                    autoFocus
+                  />
+                  
+                  {/* Quick Preset Semester Chips */}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    <span className="text-[10px] text-gray-400 self-center">Pilihan Cepat:</span>
+                    {[
+                      'Semester Ganjil 2024/2025',
+                      'Semester Genap 2024/2025',
+                      'PTA 2024/2025',
+                      'ATA 2024/2025',
+                    ].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setNamaSemesterInput(preset)}
+                        className="text-[10px] px-2 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    disabled={archiveLoading}
+                    onClick={() => setIsArchiveModalOpen(false)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-xs font-bold hover:bg-gray-50 transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    id="btn-confirm-archive"
+                    disabled={archiveLoading || jadwalList.length === 0}
+                    className="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+                  >
+                    {archiveLoading ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Memindahkan Data...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Archive className="w-3.5 h-3.5" />
+                        <span>Proses & Archive Data</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

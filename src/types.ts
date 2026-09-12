@@ -140,3 +140,19 @@ export interface DatabaseTestResult {
   serverTime: string;
   engine: string;
 }
+
+export interface JadwalKursusArchive {
+  id: number;
+  npm: string;
+  kelas: string;
+  nama_mahasiswa: string;
+  sesi: number;
+  nama_semester: string;
+  archived_at?: string;
+}
+
+export interface ArchiveSemesterSummary {
+  nama_semester: string;
+  total_mahasiswa: number;
+  last_archived?: string;
+}

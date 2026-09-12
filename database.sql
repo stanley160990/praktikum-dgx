@@ -143,6 +143,24 @@ CREATE TABLE IF NOT EXISTS status_login_mahasiswa (
 CREATE INDEX IF NOT EXISTS idx_status_login_npm ON status_login_mahasiswa(npm);
 CREATE INDEX IF NOT EXISTS idx_status_login_tgl ON status_login_mahasiswa(tgl_login);
 
+-- ------------------------------------------------------------
+-- 9. TABEL: jadwal_kursus_archive
+-- Data arsip jadwal mahasiswa yang telah di-archive per semester
+-- Kolom: npm, kelas, nama_mahasiswa, sesi, nama_semester
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS jadwal_kursus_archive (
+    id SERIAL PRIMARY KEY,
+    npm VARCHAR(50) NOT NULL,
+    kelas VARCHAR(50) NOT NULL,
+    nama_mahasiswa VARCHAR(255) NOT NULL,
+    sesi INT NOT NULL,
+    nama_semester VARCHAR(100) NOT NULL,
+    archived_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_archive_semester ON jadwal_kursus_archive(nama_semester);
+CREATE INDEX IF NOT EXISTS idx_archive_npm ON jadwal_kursus_archive(npm);
+
 -- ============================================================
 -- DATA AWAL (INITIAL SEED DATA)
 -- ============================================================

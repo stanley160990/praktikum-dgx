@@ -927,6 +927,137 @@ app.delete('/api/status-login/:id', async (req, res) => {
 });
 
 // ==========================================
+// 12. ARCHIVE JADWAL MAHASISWA ROUTES
+// ==========================================
+
+// Pindahkan seluruh data dari jadwal_kursus ke jadwal_kursus_archive ditandai dengan nama_semester
+app.post('/api/archive', async (req, res) => {
+  try {
+    const { nama_semester } = req.body;
+    if (!nama_semester || !nama_semester.toString().trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Nama semester wajib diisi ketika melakukan archive data!' 
+      });
+    }
+
+    const cleanSemester = nama_semester.toString().trim();
+
+    // 1. Cek jumlah data yang akan di-archive
+    const countCheck = await db.query('SELECT COUNT(*) as count FROM jadwal_kursus');
+    const totalCount = Number((countCheck.rows[0] as any)?.count || 0);
+
+    if (totalCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tabel data jadwal mahasiswa saat ini masih kosong, tidak ada data yang dapat di-archive.',
+      });
+    }
+
+    // 2. Salin seluruh data dari jadwal_kursus ke jadwal_kursus_archive
+    // Format kolom: npm, kelas, nama_mahasiswa, sesi, dan nama semester
+    await db.query(`
+      INSERT INTO jadwal_kursus_archive (npm, kelas, nama_mahasiswa, sesi, nama_semester, archived_at)
+      SELECT npm, kelas, nama, sesi, $1, CURRENT_TIMESTAMP
+      FROM jadwal_kursus;
+    `, [cleanSemester]);
+
+    // 3. Hapus data dari jadwal_kursus
+    await db.query('DELETE FROM jadwal_kursus');
+
+    console.log(`[Archive] Berhasil memindahkan ${totalCount} data jadwal mahasiswa ke arsip semester "${cleanSemester}".`);
+
+    res.json({
+      success: true,
+      count: totalCount,
+      nama_semester: cleanSemester,
+      message: `Berhasil meng-archive ${totalCount} data mahasiswa ke semester "${cleanSemester}". Tabel jadwal aktif kini telah dikosongkan.`,
+    });
+  } catch (err: any) {
+    console.error('Archive error:', err);
+    res.status(500).json({ success: false, message: 'Gagal melakukan proses archive: ' + err.message });
+  }
+});
+
+// Ambil data mahasiswa yang telah di-archive
+app.get('/api/archive', async (req, res) => {
+  try {
+    const { semester, search } = req.query;
+    let sql = `
+      SELECT id, npm, kelas, nama_mahasiswa, sesi, nama_semester, archived_at 
+      FROM jadwal_kursus_archive 
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    let pIdx = 1;
+
+    if (semester && String(semester).trim()) {
+      sql += ` AND nama_semester = $${pIdx}`;
+      params.push(String(semester).trim());
+      pIdx++;
+    }
+
+    if (search && String(search).trim()) {
+      sql += ` AND (npm ILIKE $${pIdx} OR nama_mahasiswa ILIKE $${pIdx} OR kelas ILIKE $${pIdx})`;
+      params.push(`%${String(search).trim()}%`);
+      pIdx++;
+    }
+
+    sql += ` ORDER BY archived_at DESC, id DESC`;
+
+    const result = await db.query(sql, params);
+    res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    console.error('Fetch archive error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Daftar semester unik yang pernah di-archive
+app.get('/api/archive/semesters', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT nama_semester, COUNT(*) as total_mahasiswa, MAX(archived_at) as last_archived
+      FROM jadwal_kursus_archive
+      GROUP BY nama_semester
+      ORDER BY MAX(archived_at) DESC
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    console.error('Fetch archive semesters error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Hapus satu baris data archive
+app.delete('/api/archive/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query('DELETE FROM jadwal_kursus_archive WHERE id = $1 RETURNING *', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Data archive tidak ditemukan.' });
+    }
+    res.json({ success: true, message: 'Data archive berhasil dihapus.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Hapus batch archive berdasarkan nama semester
+app.delete('/api/archive/semester/:nama_semester', async (req, res) => {
+  try {
+    const { nama_semester } = req.params;
+    const result = await db.query('DELETE FROM jadwal_kursus_archive WHERE nama_semester = $1', [nama_semester]);
+    res.json({ 
+      success: true, 
+      message: `Berhasil menghapus seluruh data archive untuk semester "${nama_semester}".` 
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ==========================================
 // VITE MIDDLEWARE & SERVER START
 // ==========================================
 async function startServer() {
