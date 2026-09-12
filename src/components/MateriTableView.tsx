@@ -4,25 +4,20 @@ import {
   Plus, 
   Edit3, 
   Trash2, 
-  Download, 
   RefreshCw, 
-  Upload, 
   Eye, 
   X, 
-  CheckCircle2, 
   AlertCircle,
   BookOpen,
   FileSpreadsheet,
-  Layers,
   GraduationCap
 } from 'lucide-react';
-import { MateriKursus, JadwalKursus } from '../types';
-import { exportMateriToExcel, downloadSampleMateriExcel } from '../utils/excelHelper';
-import { UploadMateriModal } from './UploadMateriModal';
+import { MateriKursus, RefFakultas } from '../types';
+import { exportMateriToExcel } from '../utils/excelHelper';
 
 interface MateriTableViewProps {
   materiList: MateriKursus[];
-  jadwalList: JadwalKursus[];
+  fakultasList: RefFakultas[];
   onRefresh: () => void;
   onAddMateri: (item: Partial<MateriKursus>) => Promise<boolean>;
   onEditMateri: (id: number, item: Partial<MateriKursus>) => Promise<boolean>;
@@ -31,27 +26,28 @@ interface MateriTableViewProps {
 
 export const MateriTableView: React.FC<MateriTableViewProps> = ({
   materiList,
-  jadwalList,
+  fakultasList,
   onRefresh,
   onAddMateri,
   onEditMateri,
   onDeleteMateri,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterFakultas, setFilterFakultas] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
 
   // Modals state
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MateriKursus | null>(null);
   const [detailItem, setDetailItem] = useState<MateriKursus | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // Form state
+  const defaultFakultas = fakultasList.length > 0 ? fakultasList[0].kode_fakultas : 'FTI';
   const [formData, setFormData] = useState({
-    npm: '',
-    nama: '',
+    fakultas: defaultFakultas,
+    keterangan: '',
     materi_m1: '',
     materi_m2: '',
     materi_m3: '',
@@ -67,26 +63,30 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Filter logic: matches NPM, Nama, or any of the 10 materials!
+  // Filter logic: matches Fakultas, Nama Fakultas, Keterangan, or any of the 10 materials
   const filteredData = materiList.filter((item) => {
-    if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
-    const matchNpm = item.npm.toLowerCase().includes(term);
-    const matchNama = (item.nama || '').toLowerCase().includes(term);
-    const matchMateri = [
-      item.materi_m1,
-      item.materi_m2,
-      item.materi_m3,
-      item.materi_m4,
-      item.materi_m5,
-      item.materi_m6,
-      item.materi_m7,
-      item.materi_m8,
-      item.materi_m9,
-      item.materi_m10,
-    ].some((m) => (m || '').toLowerCase().includes(term));
+    const matchSearch =
+      !searchTerm ||
+      (item.fakultas || '').toLowerCase().includes(term) ||
+      (item.nama_fakultas || '').toLowerCase().includes(term) ||
+      (item.keterangan || '').toLowerCase().includes(term) ||
+      [
+        item.materi_m1,
+        item.materi_m2,
+        item.materi_m3,
+        item.materi_m4,
+        item.materi_m5,
+        item.materi_m6,
+        item.materi_m7,
+        item.materi_m8,
+        item.materi_m9,
+        item.materi_m10,
+      ].some((m) => (m || '').toLowerCase().includes(term));
 
-    return matchNpm || matchNama || matchMateri;
+    const matchFakultas = !filterFakultas || item.fakultas === filterFakultas;
+
+    return matchSearch && matchFakultas;
   });
 
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
@@ -94,8 +94,8 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
 
   const handleOpenAddModal = () => {
     setFormData({
-      npm: '',
-      nama: '',
+      fakultas: fakultasList.length > 0 ? fakultasList[0].kode_fakultas : 'FTI',
+      keterangan: '',
       materi_m1: '',
       materi_m2: '',
       materi_m3: '',
@@ -114,8 +114,8 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
   const handleOpenEditModal = (item: MateriKursus) => {
     setEditingItem(item);
     setFormData({
-      npm: item.npm,
-      nama: item.nama || '',
+      fakultas: item.fakultas || (fakultasList.length > 0 ? fakultasList[0].kode_fakultas : 'FTI'),
+      keterangan: item.keterangan || '',
       materi_m1: item.materi_m1 || '',
       materi_m2: item.materi_m2 || '',
       materi_m3: item.materi_m3 || '',
@@ -132,8 +132,8 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.npm.trim()) {
-      setFormError('NPM wajib diisi.');
+    if (!formData.fakultas) {
+      setFormError('Fakultas wajib dipilih.');
       return;
     }
 
@@ -160,58 +160,58 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Table Container in Professional Polish Theme */}
+      {/* Table Container */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
         {/* Toolbar Header */}
         <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-gray-50">
           <div className="flex flex-wrap items-center gap-2">
+            {/* Button Tambah as requested: 'cukup Tambah manual, - - tambah manual diganti menjadi tambah saja' */}
             <button
-              id="btn-upload-materi-popup"
-              onClick={() => setIsUploadModalOpen(true)}
-              className="px-4 py-2 bg-[#525FE1] text-white text-sm font-medium rounded shadow-sm hover:brightness-110 transition flex items-center gap-1.5"
-            >
-              <Upload className="w-4 h-4" />
-              Upload Excel Materi
-            </button>
-
-            <button
-              id="btn-tambah-materi-manual"
+              id="btn-tambah-materi"
               onClick={handleOpenAddModal}
-              className="px-3.5 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded shadow-sm hover:bg-gray-50 transition flex items-center gap-1.5"
+              className="px-4 py-2 bg-[#525FE1] text-white text-sm font-semibold rounded shadow-sm hover:brightness-110 transition flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              Tambah Manual
-            </button>
-
-            <button
-              onClick={downloadSampleMateriExcel}
-              className="px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded shadow-sm hover:bg-gray-50 transition flex items-center gap-1.5"
-              title="Download format Excel Materi (M1 - M10)"
-            >
-              <Download className="w-4 h-4" />
-              Template Excel
+              + Tambah
             </button>
 
             <button
               id="btn-export-materi-excel"
               onClick={() => exportMateriToExcel(filteredData)}
-              className="px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded shadow-sm hover:bg-gray-50 transition flex items-center gap-1.5"
+              className="px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded shadow-sm hover:bg-gray-50 transition flex items-center gap-1.5 cursor-pointer"
               title="Ekspor Data Materi ke Excel"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              Export ({filteredData.length})
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              Export Excel ({filteredData.length})
             </button>
 
             <button
               onClick={onRefresh}
-              className="p-2 bg-white border border-gray-300 text-gray-700 rounded shadow-sm hover:bg-gray-50 transition"
+              className="p-2 bg-white border border-gray-300 text-gray-700 rounded shadow-sm hover:bg-gray-50 transition cursor-pointer"
               title="Muat Ulang Data"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Filter Fakultas Dropdown */}
+            <select
+              value={filterFakultas}
+              onChange={(e) => {
+                setFilterFakultas(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 border border-gray-300 rounded text-sm bg-white outline-none focus:border-[#525FE1]"
+            >
+              <option value="">Semua Fakultas</option>
+              {fakultasList.map((f) => (
+                <option key={f.id} value={f.kode_fakultas}>
+                  {f.kode_fakultas} - {f.nama_fakultas}
+                </option>
+              ))}
+            </select>
+
             {/* Search Input */}
             <div className="relative">
               <input
@@ -222,8 +222,8 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Cari NPM, Nama, atau Materi..."
-                className="pl-9 pr-4 py-2 border border-gray-300 rounded text-sm w-64 md:w-72 outline-none focus:border-[#525FE1]"
+                placeholder="Cari materi atau fakultas..."
+                className="pl-9 pr-4 py-2 border border-gray-300 rounded text-sm w-56 md:w-64 outline-none focus:border-[#525FE1]"
               />
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
             </div>
@@ -233,12 +233,12 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
         {/* Informative Sub-header */}
         <div className="px-6 py-2.5 bg-indigo-50/40 border-b border-gray-100 flex items-center justify-between text-xs text-gray-600">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-700">Data Table Materi Pembelajaran (M1 s/d M10)</span>
+            <span className="font-semibold text-gray-700">Silabus Materi Pembelajaran Berdasarkan Fakultas (M1 s/d M10)</span>
             <span className="text-gray-400">&bull;</span>
-            <span>Total: <strong className="text-gray-900">{filteredData.length}</strong> Mahasiswa</span>
+            <span>Total: <strong className="text-gray-900">{filteredData.length}</strong> Fakultas Terdaftar</span>
           </div>
           <span className="text-gray-400 italic hidden sm:inline">
-            Klik tombol "Lihat Silabus" untuk melihat materi lengkap per mahasiswa
+            Klik ikon mata untuk melihat silabus lengkap M1 s/d M10 per fakultas
           </span>
         </div>
 
@@ -248,18 +248,18 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
             <thead>
               <tr className="bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                 <th className="px-4 py-3 border-b border-gray-200 w-12 text-center">No</th>
-                <th className="px-4 py-3 border-b border-gray-200">NPM</th>
-                <th className="px-4 py-3 border-b border-gray-200 min-w-[150px]">Nama Mahasiswa</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M1</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M2</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M3</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M4</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M5</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M6</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M7</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M8</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M9</th>
-                <th className="px-3 py-3 border-b border-gray-200 min-w-[120px]">Materi M10</th>
+                <th className="px-4 py-3 border-b border-gray-200 min-w-[170px]">Fakultas</th>
+                <th className="px-4 py-3 border-b border-gray-200 min-w-[160px]">Keterangan</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M1</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M2</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M3</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M4</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M5</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M6</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M7</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M8</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M9</th>
+                <th className="px-3 py-3 border-b border-gray-200 min-w-[110px]">M10</th>
                 <th className="px-4 py-3 border-b border-gray-200 text-center w-28">Aksi</th>
               </tr>
             </thead>
@@ -271,7 +271,7 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
                       <BookOpen className="w-8 h-8 text-gray-300" />
                       <p className="font-semibold text-gray-700">Tidak ada data materi ditemukan</p>
                       <p className="text-gray-400 text-xs">
-                        Silakan klik "Upload Excel Materi" untuk mengunggah file Excel berisi kolom npm dan Materi M1 s/d M10.
+                        Silakan klik tombol "+ Tambah" di atas untuk menambahkan silabus materi baru berdasarkan fakultas.
                       </p>
                     </div>
                   </td>
@@ -282,40 +282,47 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
                   return (
                     <tr key={item.id} className="hover:bg-gray-50/80 transition-colors">
                       <td className="px-4 py-3 text-center text-gray-400 font-mono">{itemIndex}</td>
-                      <td className="px-4 py-3 font-mono font-bold text-[#525FE1] whitespace-nowrap">
-                        {item.npm}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-indigo-50 text-[#525FE1] border border-indigo-100">
+                            {item.fakultas}
+                          </span>
+                          <span className="font-semibold text-gray-900 text-xs truncate max-w-[160px]" title={item.nama_fakultas || item.fakultas}>
+                            {item.nama_fakultas || item.fakultas}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
-                        {item.nama || '-'}
+                      <td className="px-4 py-3 text-gray-600 truncate max-w-[160px]" title={item.keterangan || '-'}>
+                        {item.keterangan || '-'}
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m1}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m1}>
                         <span className="block truncate">{item.materi_m1 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m2}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m2}>
                         <span className="block truncate">{item.materi_m2 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m3}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m3}>
                         <span className="block truncate">{item.materi_m3 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m4}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m4}>
                         <span className="block truncate">{item.materi_m4 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m5}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m5}>
                         <span className="block truncate">{item.materi_m5 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m6}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m6}>
                         <span className="block truncate">{item.materi_m6 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m7}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m7}>
                         <span className="block truncate">{item.materi_m7 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m8}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m8}>
                         <span className="block truncate">{item.materi_m8 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m9}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m9}>
                         <span className="block truncate">{item.materi_m9 || '-'}</span>
                       </td>
-                      <td className="px-3 py-3 max-w-[140px] truncate text-gray-600" title={item.materi_m10}>
+                      <td className="px-3 py-3 max-w-[120px] truncate text-gray-600" title={item.materi_m10}>
                         <span className="block truncate">{item.materi_m10 || '-'}</span>
                       </td>
                       <td className="px-4 py-3 text-center whitespace-nowrap">
@@ -323,21 +330,21 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
                           <button
                             onClick={() => setDetailItem(item)}
                             title="Lihat Detail Silabus M1-M10"
-                            className="p-1.5 text-gray-500 hover:text-[#525FE1] hover:bg-indigo-50 rounded transition"
+                            className="p-1.5 text-gray-500 hover:text-[#525FE1] hover:bg-indigo-50 rounded transition cursor-pointer"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleOpenEditModal(item)}
-                            title="Edit Materi"
-                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition"
+                            title="Edit Silabus Materi"
+                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeletingId(item.id)}
-                            title="Hapus Materi"
-                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition"
+                            title="Hapus Materi Fakultas"
+                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -352,57 +359,44 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
         </div>
 
         {/* Pagination Footer */}
-        <div className="p-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 bg-white">
-          <div>
-            Menampilkan <span className="font-semibold text-gray-800">{filteredData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</span> sampai{' '}
-            <span className="font-semibold text-gray-800">{Math.min(currentPage * pageSize, filteredData.length)}</span> dari{' '}
-            <span className="font-semibold text-gray-800">{filteredData.length}</span> entri materi
-          </div>
-
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Sebelumnya
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map((page) => (
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-gray-200 flex items-center justify-between bg-white text-xs">
+            <span className="text-gray-500">
+              Menampilkan {(currentPage - 1) * pageSize + 1} -{' '}
+              {Math.min(currentPage * pageSize, filteredData.length)} dari {filteredData.length} data
+            </span>
+            <div className="flex items-center gap-1">
               <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-3 py-1.5 border rounded transition ${
-                  currentPage === page
-                    ? 'bg-[#525FE1] text-white border-[#525FE1] font-semibold'
-                    : 'border-gray-300 hover:bg-gray-50 text-gray-700'
-                }`}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {page}
+                Sebelumnya
               </button>
-            ))}
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Selanjutnya
-            </button>
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`px-3 py-1.5 rounded font-medium ${
+                    currentPage === i + 1
+                      ? 'bg-[#525FE1] text-white'
+                      : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Selanjutnya
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Upload Materi Popup Modal */}
-      <UploadMateriModal
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        existingJadwal={jadwalList}
-        onUploadSuccess={() => {
-          onRefresh();
-          setIsUploadModalOpen(false);
-        }}
-      />
 
       {/* View Detail Silabus Modal */}
       {detailItem && (
@@ -410,17 +404,28 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#525FE1]/10 flex items-center justify-center text-[#525FE1]">
-                  <BookOpen className="w-4 h-4" />
+                <div className="w-9 h-9 rounded-lg bg-[#525FE1]/10 flex items-center justify-center text-[#525FE1]">
+                  <GraduationCap className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-900 text-sm">Silabus Materi Mahasiswa</h3>
-                  <p className="text-xs text-gray-500 font-mono">{detailItem.npm} &bull; {detailItem.nama || 'Mahasiswa'}</p>
+                  <h3 className="font-bold text-gray-900 text-base">Silabus Materi Berdasarkan Fakultas</h3>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                    <span className="font-mono font-bold text-[#525FE1] bg-indigo-50 px-1.5 py-0.5 rounded">
+                      {detailItem.fakultas}
+                    </span>
+                    <span>{detailItem.nama_fakultas || detailItem.fakultas}</span>
+                    {detailItem.keterangan && (
+                      <>
+                        <span>&bull;</span>
+                        <span className="italic">{detailItem.keterangan}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
               <button
                 onClick={() => setDetailItem(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition"
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -455,7 +460,7 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
             <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-200 flex justify-end">
               <button
                 onClick={() => setDetailItem(null)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 text-xs font-semibold rounded-lg hover:bg-gray-300 transition"
+                className="px-4 py-2 bg-gray-200 text-gray-800 text-xs font-semibold rounded-lg hover:bg-gray-300 transition cursor-pointer"
               >
                 Tutup
               </button>
@@ -469,15 +474,18 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
-              <h3 className="font-bold text-gray-900 text-base">
-                {editingItem ? 'Edit Data Materi Mahasiswa' : 'Tambah Materi Mahasiswa Baru'}
-              </h3>
+              <div className="flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-[#525FE1]" />
+                <h3 className="font-bold text-gray-900 text-base">
+                  {editingItem ? 'Edit Silabus Materi Fakultas' : 'Tambah Silabus Materi Fakultas'}
+                </h3>
+              </div>
               <button
                 onClick={() => {
                   setIsAddModalOpen(false);
                   setEditingItem(null);
                 }}
-                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition"
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -494,25 +502,34 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    NPM Mahasiswa <span className="text-red-500">*</span>
+                    Pilih Fakultas <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     required
-                    value={formData.npm}
-                    onChange={(e) => setFormData({ ...formData, npm: e.target.value })}
-                    placeholder="Contoh: 2023101001"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#525FE1]"
-                  />
+                    value={formData.fakultas}
+                    onChange={(e) => setFormData({ ...formData, fakultas: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#525FE1] bg-white font-medium"
+                  >
+                    {fakultasList.map((f) => (
+                      <option key={f.id} value={f.kode_fakultas}>
+                        {f.kode_fakultas} - {f.nama_fakultas}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Menggunakan data referensi fakultas yang tersedia di sistem.
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nama Mahasiswa</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Keterangan / Kurikulum (Opsional)
+                  </label>
                   <input
                     type="text"
-                    value={formData.nama}
-                    onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-                    placeholder="Nama Lengkap Mahasiswa"
+                    value={formData.keterangan}
+                    onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })}
+                    placeholder="Contoh: Kurikulum 2024 / Standar Fakultas"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none focus:border-[#525FE1]"
                   />
                 </div>
@@ -520,8 +537,9 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
 
               {/* M1 to M10 Inputs */}
               <div className="pt-2 border-t border-gray-100">
-                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">
-                  Silabus Materi (M1 s/d M10)
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center justify-between">
+                  <span>Silabus Materi Pembelajaran (Materi M1 s/d M10)</span>
+                  <span className="text-[10px] font-normal text-gray-400">Disesuaikan untuk kurikulum fakultas</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => {
@@ -551,14 +569,14 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
                     setIsAddModalOpen(false);
                     setEditingItem(null);
                   }}
-                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={formSubmitting}
-                  className="px-5 py-2 text-xs font-semibold text-white bg-[#525FE1] hover:brightness-110 rounded-lg shadow-sm transition disabled:opacity-50"
+                  className="px-5 py-2 text-xs font-semibold text-white bg-[#525FE1] hover:brightness-110 rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
                 >
                   {formSubmitting ? 'Menyimpan...' : 'Simpan Materi'}
                 </button>
@@ -576,21 +594,21 @@ export const MateriTableView: React.FC<MateriTableViewProps> = ({
               <Trash2 className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="font-bold text-gray-900 text-base">Hapus Materi Mahasiswa?</h4>
+              <h4 className="font-bold text-gray-900 text-base">Hapus Silabus Materi Fakultas?</h4>
               <p className="text-xs text-gray-500 mt-1">
-                Data silabus materi mahasiswa ini akan dihapus secara permanen dari database PostgreSQL.
+                Data silabus materi fakultas ini akan dihapus secara permanen dari database PostgreSQL.
               </p>
             </div>
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 onClick={() => setDeletingId(null)}
-                className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                className="px-4 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition cursor-pointer"
               >
                 Batal
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
+                className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition cursor-pointer"
               >
                 Ya, Hapus
               </button>

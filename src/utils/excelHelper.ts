@@ -5,14 +5,17 @@ export interface ExcelRow {
   Bidang: string;
   Tanggal: string;
   Sesi: number | string;
+  Fakultas?: string;
+  Minggu?: string;
   NPM: string;
   Kelas: string;
   Nama: string;
 }
 
 export interface ExcelMateriRow {
-  npm: string;
+  npm?: string;
   nama?: string;
+  fakultas?: string;
   materi_m1: string;
   materi_m2: string;
   materi_m3: string;
@@ -68,6 +71,14 @@ export function parseExcelFile(file: File): Promise<ExcelRow[]> {
           let sesi = parseInt(String(findVal(['sesi', 'session', 'sesi_ke'])), 10);
           if (isNaN(sesi) || sesi < 1) sesi = 1;
 
+          const fakultas = String(findVal(['fakultas', 'kode_fakultas', 'fak', 'faculty'])).trim().toUpperCase();
+          
+          let rawMinggu = String(findVal(['minggu', 'week', 'minggu_ke', 'kode_minggu', 'm'])).trim().toUpperCase();
+          let minggu = 'M1';
+          if (rawMinggu) {
+            minggu = rawMinggu.startsWith('M') ? rawMinggu : `M${rawMinggu}`;
+          }
+
           const npm = String(findVal(['npm', 'nim', 'nomor_pokok', 'id_mahasiswa'])).trim();
           const kelas = String(findVal(['kelas', 'class', 'kode_kelas'])).trim();
           const nama = String(findVal(['nama', 'name', 'nama_mahasiswa'])).trim();
@@ -76,6 +87,8 @@ export function parseExcelFile(file: File): Promise<ExcelRow[]> {
             Bidang: bidang,
             Tanggal: tanggal || new Date().toISOString().split('T')[0],
             Sesi: sesi,
+            Fakultas: fakultas || '',
+            Minggu: minggu,
             NPM: npm,
             Kelas: kelas || (bidang === 'TEKREK' ? 'TEK-01' : 'SOS-01'),
             Nama: nama,
@@ -98,13 +111,13 @@ export function downloadSampleExcel() {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
   const sampleData: ExcelRow[] = [
-    { Bidang: 'TEKREK', Tanggal: today, Sesi: 1, NPM: '2023101001', Kelas: 'TEK-01', Nama: 'Budi Santoso' },
-    { Bidang: 'TEKREK', Tanggal: today, Sesi: 2, NPM: '2023101002', Kelas: 'TEK-02', Nama: 'Siti Rahmawati' },
-    { Bidang: 'SOSHUM', Tanggal: today, Sesi: 3, NPM: '2023202001', Kelas: 'SOS-01', Nama: 'Andi Pratama' },
-    { Bidang: 'SOSHUM', Tanggal: tomorrow, Sesi: 1, NPM: '2023202002', Kelas: 'SOS-02', Nama: 'Dewi Lestari' },
-    { Bidang: 'TEKREK', Tanggal: tomorrow, Sesi: 4, NPM: '2023101003', Kelas: 'TEK-01', Nama: 'Rizky Firmansyah' },
+    { Bidang: 'TEKREK', Tanggal: today, Sesi: 1, Fakultas: 'FIKTI', Minggu: 'M1', NPM: '2023101001', Kelas: 'TEK-01', Nama: 'Budi Santoso' },
+    { Bidang: 'TEKREK', Tanggal: today, Sesi: 2, Fakultas: 'FTI', Minggu: 'M1', NPM: '2023101002', Kelas: 'TEK-02', Nama: 'Siti Rahmawati' },
+    { Bidang: 'SOSHUM', Tanggal: today, Sesi: 3, Fakultas: 'FE', Minggu: 'M2', NPM: '2023202001', Kelas: 'SOS-01', Nama: 'Andi Pratama' },
+    { Bidang: 'SOSHUM', Tanggal: tomorrow, Sesi: 1, Fakultas: 'FSB', Minggu: 'M2', NPM: '2023202002', Kelas: 'SOS-02', Nama: 'Dewi Lestari' },
+    { Bidang: 'TEKREK', Tanggal: tomorrow, Sesi: 4, Fakultas: 'FIKTI', Minggu: 'M3', NPM: '2023101003', Kelas: 'TEK-01', Nama: 'Rizky Firmansyah' },
     // Contoh NPM sama untuk menguji Aturan #5 (Menambahkan, bukan replace)
-    { Bidang: 'TEKREK', Tanggal: tomorrow, Sesi: 2, NPM: '2023101001', Kelas: 'TEK-02', Nama: 'Budi Santoso' },
+    { Bidang: 'TEKREK', Tanggal: tomorrow, Sesi: 2, Fakultas: 'FIKTI', Minggu: 'M4', NPM: '2023101001', Kelas: 'TEK-02', Nama: 'Budi Santoso' },
   ];
 
   const worksheet = XLSX.utils.json_to_sheet(sampleData);
@@ -120,6 +133,8 @@ export function exportJadwalToExcel(data: JadwalKursus[], filename = 'Data_Jadwa
     Bidang: d.bidang,
     Tanggal: d.tanggal,
     Sesi: `Sesi ${d.sesi}`,
+    Fakultas: d.fakultas || '-',
+    Minggu: d.minggu || 'M1',
     NPM: d.npm,
     Kelas: d.kelas,
     Nama: d.nama,
@@ -252,11 +267,12 @@ export function downloadSampleMateriExcel() {
   XLSX.writeFile(workbook, 'Template_Upload_Materi_M1_M10.xlsx');
 }
 
-export function exportMateriToExcel(data: MateriKursus[], filename = 'Data_Materi_Mahasiswa.xlsx') {
+export function exportMateriToExcel(data: MateriKursus[], filename = 'Data_Materi_Fakultas.xlsx') {
   const rows = data.map((d, index) => ({
     No: index + 1,
-    NPM: d.npm,
-    'Nama Mahasiswa': d.nama || '-',
+    'Kode Fakultas': d.fakultas || '-',
+    'Nama Fakultas': d.nama_fakultas || d.fakultas || '-',
+    'Keterangan / Kurikulum': d.keterangan || '-',
     'Materi M1': d.materi_m1 || '-',
     'Materi M2': d.materi_m2 || '-',
     'Materi M3': d.materi_m3 || '-',
@@ -272,7 +288,7 @@ export function exportMateriToExcel(data: MateriKursus[], filename = 'Data_Mater
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Materi');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Materi_Fakultas');
 
   XLSX.writeFile(workbook, filename);
 }

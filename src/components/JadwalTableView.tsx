@@ -12,13 +12,15 @@ import {
   AlertTriangle,
   Upload
 } from 'lucide-react';
-import { JadwalKursus, RefSesi, RefKelas } from '../types';
+import { JadwalKursus, RefSesi, RefKelas, RefFakultas, RefMinggu } from '../types';
 import { exportJadwalToExcel } from '../utils/excelHelper';
 
 interface JadwalTableViewProps {
   jadwalList: JadwalKursus[];
   sesiList: RefSesi[];
   kelasList: RefKelas[];
+  fakultasList?: RefFakultas[];
+  mingguList?: RefMinggu[];
   onRefresh: () => void;
   onAddManual: (item: Partial<JadwalKursus>) => Promise<boolean>;
   onEdit: (id: number, item: Partial<JadwalKursus>) => Promise<boolean>;
@@ -31,6 +33,8 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
   jadwalList,
   sesiList,
   kelasList,
+  fakultasList = [],
+  mingguList = [],
   onRefresh,
   onAddManual,
   onEdit,
@@ -40,12 +44,15 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
 }) => {
   // Sort sesiList by nomor_sesi ascending
   const sortedSesiList = [...sesiList].sort((a, b) => a.nomor_sesi - b.nomor_sesi);
+  const sortedMingguList = [...mingguList].sort((a, b) => a.urutan - b.urutan);
 
   // Search and Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBidang, setFilterBidang] = useState('');
   const [filterSesi, setFilterSesi] = useState('');
   const [filterTanggal, setFilterTanggal] = useState('');
+  const [filterFakultas, setFilterFakultas] = useState('');
+  const [filterMinggu, setFilterMinggu] = useState('');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -61,6 +68,8 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
     bidang: 'TEKREK' as 'TEKREK' | 'SOSHUM',
     tanggal: new Date().toISOString().split('T')[0],
     sesi: 1,
+    fakultas: '',
+    minggu: 'M1',
     npm: '',
     kelas: 'TEK-01',
     nama: '',
@@ -75,13 +84,17 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
       searchTerm === '' ||
       item.npm.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.kelas.toLowerCase().includes(searchTerm.toLowerCase());
+      item.kelas.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.fakultas || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.minggu || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchBidang = filterBidang === '' || item.bidang === filterBidang;
     const matchSesi = filterSesi === '' || String(item.sesi) === filterSesi;
     const matchTanggal = filterTanggal === '' || item.tanggal === filterTanggal;
+    const matchFakultas = filterFakultas === '' || (item.fakultas || '') === filterFakultas;
+    const matchMinggu = filterMinggu === '' || (item.minggu || '') === filterMinggu;
 
-    return matchSearch && matchBidang && matchSesi && matchTanggal;
+    return matchSearch && matchBidang && matchSesi && matchTanggal && matchFakultas && matchMinggu;
   });
 
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
@@ -92,15 +105,21 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
     setFilterBidang('');
     setFilterSesi('');
     setFilterTanggal('');
+    setFilterFakultas('');
+    setFilterMinggu('');
     setCurrentPage(1);
   };
 
   const handleOpenAddModal = () => {
     const defaultSesi = sortedSesiList.length > 0 ? sortedSesiList[0].nomor_sesi : 1;
+    const defaultFakultas = fakultasList.length > 0 ? fakultasList[0].kode_fakultas : 'FIKTI';
+    const defaultMinggu = sortedMingguList.length > 0 ? sortedMingguList[0].kode_minggu : 'M1';
     setFormData({
       bidang: 'TEKREK',
       tanggal: new Date().toISOString().split('T')[0],
       sesi: defaultSesi,
+      fakultas: defaultFakultas,
+      minggu: defaultMinggu,
       npm: '',
       kelas: kelasList.find((k) => k.bidang === 'TEKREK')?.kode_kelas || '3IA01',
       nama: '',
@@ -115,6 +134,8 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
       bidang: item.bidang,
       tanggal: item.tanggal,
       sesi: item.sesi,
+      fakultas: item.fakultas || '',
+      minggu: item.minggu || 'M1',
       npm: item.npm,
       kelas: item.kelas,
       nama: item.nama,
@@ -221,6 +242,50 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
               <option value="TEKREK">TEKREK</option>
             </select>
 
+            {/* Filter Fakultas dropdown */}
+            <select
+              id="filter-fakultas-jadwal"
+              value={filterFakultas}
+              onChange={(e) => {
+                setFilterFakultas(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="py-2 px-3 border border-gray-300 rounded text-sm bg-white text-gray-700 outline-none"
+            >
+              <option value="">Semua Fakultas</option>
+              {fakultasList.map((f) => (
+                <option key={f.id || f.kode_fakultas} value={f.kode_fakultas}>
+                  {f.kode_fakultas} - {f.nama_fakultas}
+                </option>
+              ))}
+            </select>
+
+            {/* Filter Minggu dropdown */}
+            <select
+              id="filter-minggu-jadwal"
+              value={filterMinggu}
+              onChange={(e) => {
+                setFilterMinggu(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="py-2 px-3 border border-gray-300 rounded text-sm bg-white text-gray-700 outline-none"
+            >
+              <option value="">Semua Minggu</option>
+              {sortedMingguList.length > 0 ? (
+                sortedMingguList.map((m) => (
+                  <option key={m.id || m.kode_minggu} value={m.kode_minggu}>
+                    {m.kode_minggu} ({m.nama_minggu})
+                  </option>
+                ))
+              ) : (
+                Array.from({ length: 10 }, (_, i) => `M${i + 1}`).map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))
+              )}
+            </select>
+
             {/* Filter Sesi dropdown */}
             <select
               id="filter-sesi-jadwal"
@@ -272,6 +337,8 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
             <thead>
               <tr className="bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
                 <th className="px-6 py-3 border-b border-gray-200">Bidang</th>
+                <th className="px-6 py-3 border-b border-gray-200">Fakultas</th>
+                <th className="px-6 py-3 border-b border-gray-200 text-center">Minggu</th>
                 <th className="px-6 py-3 border-b border-gray-200">NPM</th>
                 <th className="px-6 py-3 border-b border-gray-200">Nama Mahasiswa</th>
                 <th className="px-6 py-3 border-b border-gray-200">Tanggal</th>
@@ -284,7 +351,7 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
             <tbody className="text-sm text-gray-700">
               {paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={10} className="px-6 py-12 text-center text-gray-400 text-sm">
                     Tidak ada data jadwal ditemukan. Silakan tambahkan data atau import file Excel.
                   </td>
                 </tr>
@@ -298,6 +365,20 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
                           : 'bg-purple-100 text-purple-700'
                       }`}>
                         {item.bidang}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {item.fakultas ? (
+                        <span className="px-2 py-1 rounded-md text-[11px] font-bold font-mono bg-indigo-50 text-[#525FE1] border border-indigo-100">
+                          {item.fakultas}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="px-2 py-1 rounded-md text-[11px] font-bold font-mono bg-purple-50 text-purple-700 border border-purple-200">
+                        {item.minggu || 'M1'}
                       </span>
                     </td>
                     <td className="px-6 py-4 font-mono font-medium">{item.npm}</td>
@@ -476,6 +557,59 @@ export const JadwalTableView: React.FC<JadwalTableViewProps> = ({
                       <option value={formData.sesi}>
                         Sesi {formData.sesi} (Sesi Tersimpan)
                       </option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    Minggu Pertemuan <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="select-modal-minggu"
+                    required
+                    value={formData.minggu}
+                    onChange={(e) => setFormData({ ...formData, minggu: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-gray-300 outline-none focus:border-[#525FE1] text-gray-800 font-mono font-bold"
+                  >
+                    {sortedMingguList.length > 0 ? (
+                      sortedMingguList.map((m) => (
+                        <option key={m.id || m.kode_minggu} value={m.kode_minggu}>
+                          {m.kode_minggu} - {m.nama_minggu}
+                        </option>
+                      ))
+                    ) : (
+                      Array.from({ length: 10 }, (_, i) => `M${i + 1}`).map((m) => (
+                        <option key={m} value={m}>
+                          {m} - Minggu ke-{m.replace('M', '')}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">
+                    Fakultas <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="select-modal-fakultas"
+                    required
+                    value={formData.fakultas}
+                    onChange={(e) => setFormData({ ...formData, fakultas: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-gray-300 outline-none focus:border-[#525FE1] text-gray-800"
+                  >
+                    <option value="">-- Pilih Fakultas --</option>
+                    {fakultasList.map((f) => (
+                      <option key={f.id || f.kode_fakultas} value={f.kode_fakultas}>
+                        {f.kode_fakultas} - {f.nama_fakultas}
+                      </option>
+                    ))}
+                    {/* Fallback jika ada data yang fakultasnya tidak terdaftar di master */}
+                    {formData.fakultas && !fakultasList.some((f) => f.kode_fakultas === formData.fakultas) && (
+                      <option value={formData.fakultas}>{formData.fakultas}</option>
                     )}
                   </select>
                 </div>

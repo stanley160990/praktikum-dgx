@@ -1,6 +1,6 @@
 {
   "name": "Sistem Manajemen Jadwal Mahasiswa",
-  "description": "Sistem pengelolaan akun dan jadwal mahasiswa berbasis PostgreSQL dengan fitur upload excel, login admin, dan manajemen data sesi & kelas.",
+  "description": "Sistem pengelolaan akun dan jadwal mahasiswa berbasis PostgreSQL dengan fitur upload excel, login admin, enkripsi password sha1, auto-logout sesi 15 menit, silabus materi M1-M10 berbasis fakultas, serta manajemen data referensi sesi, kelas, fakultas, dan minggu.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

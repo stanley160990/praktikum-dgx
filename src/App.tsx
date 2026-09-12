@@ -10,7 +10,7 @@ import { ReferensiView } from './components/ReferensiView';
 import { StatusLoginMahasiswaView } from './components/StatusLoginMahasiswaView';
 import { LiveStatusLoginView } from './components/LiveStatusLoginView';
 import { AdminLogin } from './components/AdminLogin';
-import { AdminUser, JadwalKursus, MateriKursus, RefSesi, RefKelas } from './types';
+import { AdminUser, JadwalKursus, MateriKursus, RefSesi, RefKelas, RefFakultas, RefMinggu } from './types';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 // Durasi otomatis logout saat tidak ada aksi (15 menit = 900.000 ms)
@@ -137,6 +137,8 @@ export default function App() {
   const [materiList, setMateriList] = useState<MateriKursus[]>([]);
   const [sesiList, setSesiList] = useState<RefSesi[]>([]);
   const [kelasList, setKelasList] = useState<RefKelas[]>([]);
+  const [fakultasList, setFakultasList] = useState<RefFakultas[]>([]);
+  const [mingguList, setMingguList] = useState<RefMinggu[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadJadwalModalOpen, setUploadJadwalModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -173,17 +175,26 @@ export default function App() {
     }
   };
 
-  // Fetch Referensi Sesi & Kelas
+  // Fetch Referensi Sesi, Kelas, Fakultas, & Minggu
   const fetchReferensi = async () => {
     try {
-      const [resSesi, resKelas] = await Promise.all([
+      const [resSesi, resKelas, resFakultas, resMinggu] = await Promise.all([
         fetch('/api/referensi/sesi'),
         fetch('/api/referensi/kelas'),
+        fetch('/api/referensi/fakultas'),
+        fetch('/api/referensi/minggu'),
       ]);
-      const [dataSesi, dataKelas] = await Promise.all([resSesi.json(), resKelas.json()]);
+      const [dataSesi, dataKelas, dataFakultas, dataMinggu] = await Promise.all([
+        resSesi.json(),
+        resKelas.json(),
+        resFakultas.json(),
+        resMinggu.json(),
+      ]);
 
       if (dataSesi.success) setSesiList(dataSesi.data);
       if (dataKelas.success) setKelasList(dataKelas.data);
+      if (dataFakultas.success) setFakultasList(dataFakultas.data);
+      if (dataMinggu.success) setMingguList(dataMinggu.data);
     } catch (err) {
       console.error('Error fetching referensi:', err);
     }
@@ -408,6 +419,8 @@ export default function App() {
               jadwalList={jadwalList}
               sesiList={sesiList}
               kelasList={kelasList}
+              fakultasList={fakultasList}
+              mingguList={mingguList}
               onRefresh={fetchJadwal}
               onAddManual={handleAddManual}
               onEdit={handleEdit}
@@ -418,7 +431,7 @@ export default function App() {
           ) : activeTab === 'materi' ? (
             <MateriTableView
               materiList={materiList}
-              jadwalList={jadwalList}
+              fakultasList={fakultasList}
               onRefresh={fetchMateri}
               onAddMateri={handleAddMateri}
               onEditMateri={handleEditMateri}
@@ -437,6 +450,8 @@ export default function App() {
             <ReferensiView
               sesiList={sesiList}
               kelasList={kelasList}
+              fakultasList={fakultasList}
+              mingguList={mingguList}
               onRefresh={fetchReferensi}
             />
           ) : null}

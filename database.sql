@@ -49,8 +49,33 @@ CREATE TABLE IF NOT EXISTS ref_kelas (
 );
 
 -- ------------------------------------------------------------
--- 4. TABEL: jadwal_kursus
--- Format Data Excel: Bidang, Tanggal, Sesi, NPM, Kelas, Nama
+-- 4. TABEL: ref_fakultas
+-- Referensi kode dan nama fakultas universitas
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ref_fakultas (
+    id SERIAL PRIMARY KEY,
+    kode_fakultas VARCHAR(20) UNIQUE NOT NULL,
+    nama_fakultas VARCHAR(150) NOT NULL,
+    keterangan VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------
+-- 5. TABEL: ref_minggu
+-- Referensi minggu pertemuan kursus (Default: M1 sampai dengan M10)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ref_minggu (
+    id SERIAL PRIMARY KEY,
+    kode_minggu VARCHAR(20) UNIQUE NOT NULL,
+    nomor_minggu INT NOT NULL,
+    nama_minggu VARCHAR(100) NOT NULL,
+    keterangan VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------
+-- 6. TABEL: jadwal_kursus
+-- Format Data Excel: Bidang, Tanggal, Sesi, Fakultas, Minggu, NPM, Kelas, Nama
 -- Aturan Khusus: Duplikasi NPM tetap ditambahkan (append)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS jadwal_kursus (
@@ -58,6 +83,8 @@ CREATE TABLE IF NOT EXISTS jadwal_kursus (
     bidang VARCHAR(20) NOT NULL CHECK (bidang IN ('SOSHUM', 'TEKREK')),
     tanggal DATE NOT NULL,
     sesi INT NOT NULL,
+    fakultas VARCHAR(50),
+    minggu VARCHAR(20) DEFAULT 'M1',
     npm VARCHAR(50) NOT NULL,
     kelas VARCHAR(50) NOT NULL,
     nama VARCHAR(255) NOT NULL,
@@ -71,15 +98,17 @@ CREATE INDEX IF NOT EXISTS idx_jadwal_npm ON jadwal_kursus(npm);
 CREATE INDEX IF NOT EXISTS idx_jadwal_tanggal ON jadwal_kursus(tanggal);
 CREATE INDEX IF NOT EXISTS idx_jadwal_sesi ON jadwal_kursus(sesi);
 CREATE INDEX IF NOT EXISTS idx_jadwal_bidang ON jadwal_kursus(bidang);
+CREATE INDEX IF NOT EXISTS idx_jadwal_fakultas ON jadwal_kursus(fakultas);
+CREATE INDEX IF NOT EXISTS idx_jadwal_minggu ON jadwal_kursus(minggu);
 
 -- ------------------------------------------------------------
--- 5. TABEL: materi_kursus
--- Format Data Excel: npm, nama, Materi M1 s/d Materi M10
+-- 7. TABEL: materi_kursus
+-- Data Materi Pembelajaran M1 s/d M10 Berdasarkan FAKULTAS
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS materi_kursus (
     id SERIAL PRIMARY KEY,
-    npm VARCHAR(50) UNIQUE NOT NULL,
-    nama VARCHAR(255),
+    fakultas VARCHAR(50) NOT NULL,
+    keterangan VARCHAR(255),
     materi_m1 TEXT,
     materi_m2 TEXT,
     materi_m3 TEXT,
@@ -95,10 +124,10 @@ CREATE TABLE IF NOT EXISTS materi_kursus (
 );
 
 -- Indeks Performa Query Materi
-CREATE INDEX IF NOT EXISTS idx_materi_npm ON materi_kursus(npm);
+CREATE INDEX IF NOT EXISTS idx_materi_fakultas ON materi_kursus(fakultas);
 
 -- ------------------------------------------------------------
--- 6. TABEL: status_login_mahasiswa
+-- 8. TABEL: status_login_mahasiswa
 -- Data login mahasiswa yang dicatat otomatis oleh sistem eksternal
 -- Kolom: npm, kelas, sesi, tgl_login
 -- ------------------------------------------------------------
@@ -141,17 +170,43 @@ INSERT INTO ref_kelas (kode_kelas, nama_kelas, bidang, kapasitas) VALUES
 ('SOS-02', 'Sosial Humaniora Kelas B', 'SOSHUM', 40)
 ON CONFLICT (kode_kelas) DO NOTHING;
 
--- 4. Contoh Data Jadwal Kursus
-INSERT INTO jadwal_kursus (bidang, tanggal, sesi, npm, kelas, nama, status_entry) VALUES
-('TEKREK', CURRENT_DATE, 1, '2023101001', 'TEK-01', 'Budi Santoso', 'BARU'),
-('TEKREK', CURRENT_DATE, 2, '2023101002', 'TEK-02', 'Siti Rahmawati', 'BARU'),
-('SOSHUM', CURRENT_DATE, 3, '2023202001', 'SOS-01', 'Andi Pratama', 'BARU'),
-('SOSHUM', CURRENT_DATE + INTERVAL '1 day', 1, '2023202002', 'SOS-02', 'Dewi Lestari', 'BARU'),
-('TEKREK', CURRENT_DATE + INTERVAL '1 day', 4, '2023101003', 'TEK-01', 'Rizky Firmansyah', 'BARU');
+-- 4. Referensi Fakultas (Nilai Default Universitas)
+INSERT INTO ref_fakultas (kode_fakultas, nama_fakultas, keterangan) VALUES
+('FTI', 'Fakultas Teknologi Industri', 'Fakultas Teknologi Industri'),
+('FIKTI', 'Fakultas Ilmu Komputer dan Teknologi Informasi', 'Fakultas Ilmu Komputer dan Teknologi Informasi'),
+('FTSP', 'Fakultas Teknik Sipil dan Prencanaan', 'Fakultas Teknik Sipil dan Prencanaan'),
+('FIKES', 'Fakultas Ilmu Kesehatan Masyarakat', 'Fakultas Ilmu Kesehatan Masyarakat'),
+('FE', 'Fakultas Ekonomi', 'Fakultas Ekonomi'),
+('FSB', 'Fakultas Sastra dan Bahasa', 'Fakultas Sastra dan Bahasa'),
+('FPSI', 'Fakultas Psikologi', 'Fakultas Psikologi'),
+('FIKOM', 'Fakultas Ilmu Ekonomi', 'Fakultas Ilmu Ekonomi')
+ON CONFLICT (kode_fakultas) DO UPDATE SET nama_fakultas = EXCLUDED.nama_fakultas;
 
--- 5. Contoh Data Materi Kursus (M1 s/d M10)
-INSERT INTO materi_kursus (npm, nama, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10) VALUES
-('2023101001', 'Budi Santoso', 
+-- 5. Referensi Minggu Pertemuan (M1 sampai dengan M10)
+INSERT INTO ref_minggu (kode_minggu, nomor_minggu, nama_minggu, keterangan) VALUES
+('M1', 1, 'Minggu 1', 'Pertemuan Perkuliahan Minggu ke-1'),
+('M2', 2, 'Minggu 2', 'Pertemuan Perkuliahan Minggu ke-2'),
+('M3', 3, 'Minggu 3', 'Pertemuan Perkuliahan Minggu ke-3'),
+('M4', 4, 'Minggu 4', 'Pertemuan Perkuliahan Minggu ke-4'),
+('M5', 5, 'Minggu 5', 'Pertemuan Perkuliahan Minggu ke-5'),
+('M6', 6, 'Minggu 6', 'Pertemuan Perkuliahan Minggu ke-6'),
+('M7', 7, 'Minggu 7', 'Pertemuan Perkuliahan Minggu ke-7'),
+('M8', 8, 'Minggu 8', 'Pertemuan Perkuliahan Minggu ke-8'),
+('M9', 9, 'Minggu 9', 'Pertemuan Perkuliahan Minggu ke-9'),
+('M10', 10, 'Minggu 10', 'Pertemuan Perkuliahan Minggu ke-10')
+ON CONFLICT (kode_minggu) DO NOTHING;
+
+-- 6. Contoh Data Jadwal Kursus
+INSERT INTO jadwal_kursus (bidang, tanggal, sesi, fakultas, minggu, npm, kelas, nama, status_entry) VALUES
+('TEKREK', CURRENT_DATE, 1, 'FIKTI', 'M1', '2023101001', 'TEK-01', 'Budi Santoso', 'BARU'),
+('TEKREK', CURRENT_DATE, 2, 'FTI', 'M1', '2023101002', 'TEK-02', 'Siti Rahmawati', 'BARU'),
+('SOSHUM', CURRENT_DATE, 3, 'FE', 'M2', '2023202001', 'SOS-01', 'Andi Pratama', 'BARU'),
+('SOSHUM', CURRENT_DATE + INTERVAL '1 day', 1, 'FSB', 'M2', '2023202002', 'SOS-02', 'Dewi Lestari', 'BARU'),
+('TEKREK', CURRENT_DATE + INTERVAL '1 day', 4, 'FIKTI', 'M3', '2023101003', 'TEK-01', 'Rizky Firmansyah', 'BARU');
+
+-- 7. Contoh Data Materi Kursus Berdasarkan FAKULTAS (M1 s/d M10)
+INSERT INTO materi_kursus (fakultas, keterangan, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10) VALUES
+('FIKTI', 'Kurikulum Komputasi & Pemrograman Terapan',
  'Pengenalan Algoritma & Dasar Pemrograman', 
  'Variabel, Tipe Data, & Operator Logika', 
  'Struktur Percabangan If-Else & Switch-Case', 
@@ -162,7 +217,7 @@ INSERT INTO materi_kursus (npm, nama, materi_m1, materi_m2, materi_m3, materi_m4
  'Struktur Data Stack & Queue', 
  'Algoritma Sorting & Searching', 
  'Proyek Mini Solusi Algoritma Mandiri'),
-('2023101002', 'Siti Rahmawati', 
+('FTI', 'Kurikulum Sistem Basis Data & Rekayasa Industri',
  'Pengantar Basis Data Relasional & DBMS', 
  'Perancangan ERD & Normalisasi 3NF', 
  'Data Definition Language (CREATE/ALTER/DROP)', 
@@ -173,9 +228,9 @@ INSERT INTO materi_kursus (npm, nama, materi_m1, materi_m2, materi_m3, materi_m4
  'Stored Procedure & User Defined Function', 
  'Database Trigger & Optimasi Indeks', 
  'Backup, Restore, & Manajemen Hak Akses'),
-('2023202001', 'Andi Pratama', 
+('FE', 'Kurikulum Manajemen Bisnis & Analisis Pasar',
  'Komunikasi Bisnis & Negosiasi Interpersonal', 
- 'Teknik Presentasi & Pitching Ide', 
+ 'Teknik Presentasi & Pitching Ide Bisnis', 
  'Etika Profesi & Tata Kelola Bisnis Modern', 
  'Manajemen Organisasi & Pengembangan SDM', 
  'Riset Pasar & Analisis Perilaku Konsumen', 
@@ -183,8 +238,7 @@ INSERT INTO materi_kursus (npm, nama, materi_m1, materi_m2, materi_m3, materi_m4
  'Kepemimpinan & Kerja Sama Tim Lintas Fungsi', 
  'Perencanaan Rencana Bisnis Strategis (Business Plan)', 
  'Evaluasi Kinerja Keuangan & Manajemen Risiko', 
- 'Presentasi Sidang Studi Kasus Akhir')
-ON CONFLICT (npm) DO NOTHING;
+ 'Presentasi Sidang Studi Kasus Akhir');
 
 -- 6. Contoh Data Status Login Mahasiswa (Diinput oleh Sistem Lain)
 INSERT INTO status_login_mahasiswa (npm, kelas, sesi, tgl_login) VALUES

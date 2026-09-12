@@ -138,29 +138,37 @@ export const UploadExcelView: React.FC<UploadExcelViewProps> = ({
           </div>
           <div className="space-y-2 flex-1">
             <h3 className="font-semibold text-gray-800 text-sm">Spesifikasi Kolom Excel & Aturan Sistem:</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 text-xs">
               <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
                 <span className="font-bold text-gray-700 block">Kolom 1: Bidang</span>
                 <span className="text-gray-500 text-[11px]">SOSHUM / TEKREK</span>
               </div>
               <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-                <span className="font-bold text-gray-700 block">Kolom 2: Tanggal</span>
+                <span className="font-bold text-gray-700 block">Kolom 2: Fakultas</span>
+                <span className="text-gray-500 text-[11px]">FIKTI, FTI, dll</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
+                <span className="font-bold text-gray-700 block">Kolom 3: Minggu</span>
+                <span className="text-gray-500 text-[11px]">M1 s/d M10</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
+                <span className="font-bold text-gray-700 block">Kolom 4: Tanggal</span>
                 <span className="text-gray-500 text-[11px]">YYYY-MM-DD</span>
               </div>
               <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-                <span className="font-bold text-gray-700 block">Kolom 3: Sesi</span>
+                <span className="font-bold text-gray-700 block">Kolom 5: Sesi</span>
                 <span className="text-gray-500 text-[11px]">1, 2, 3, atau 4</span>
               </div>
               <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-                <span className="font-bold text-gray-700 block">Kolom 4: NPM</span>
+                <span className="font-bold text-gray-700 block">Kolom 6: NPM</span>
                 <span className="text-gray-500 text-[11px]">Varchar (NIM)</span>
               </div>
               <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-                <span className="font-bold text-gray-700 block">Kolom 5: Kelas</span>
+                <span className="font-bold text-gray-700 block">Kolom 7: Kelas</span>
                 <span className="text-gray-500 text-[11px]">Varchar (3IA01)</span>
               </div>
               <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-                <span className="font-bold text-gray-700 block">Kolom 6: Nama</span>
+                <span className="font-bold text-gray-700 block">Kolom 8: Nama</span>
                 <span className="text-gray-500 text-[11px]">Varchar (Nama)</span>
               </div>
             </div>
@@ -356,6 +364,8 @@ export const UploadExcelView: React.FC<UploadExcelViewProps> = ({
                 <tr>
                   <th className="p-3.5 w-12 text-center">No</th>
                   <th className="p-3.5">Bidang</th>
+                  <th className="p-3.5">Fakultas</th>
+                  <th className="p-3.5 text-center">Minggu</th>
                   <th className="p-3.5">Tanggal</th>
                   <th className="p-3.5">Sesi</th>
                   <th className="p-3.5">NPM</th>
@@ -376,6 +386,20 @@ export const UploadExcelView: React.FC<UploadExcelViewProps> = ({
                           row.Bidang === 'SOSHUM' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
                         }`}>
                           {row.Bidang}
+                        </span>
+                      </td>
+                      <td className="p-3.5">
+                        {row.Fakultas ? (
+                          <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-indigo-50 text-[#525FE1] border border-indigo-100">
+                            {row.Fakultas}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 text-[11px]">-</span>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-center">
+                        <span className="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-purple-50 text-purple-700 border border-purple-100">
+                          {row.Minggu || 'M1'}
                         </span>
                       </td>
                       <td className="p-3.5 font-medium text-gray-900 font-mono">{row.Tanggal}</td>

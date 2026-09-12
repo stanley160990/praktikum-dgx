@@ -26,11 +26,30 @@ export interface RefKelas {
   created_at?: string;
 }
 
+export interface RefFakultas {
+  id: number;
+  kode_fakultas: string;
+  nama_fakultas: string;
+  keterangan?: string;
+  created_at?: string;
+}
+
+export interface RefMinggu {
+  id: number;
+  kode_minggu: string;
+  nomor_minggu: number;
+  nama_minggu: string;
+  keterangan?: string;
+  created_at?: string;
+}
+
 export interface JadwalKursus {
   id: number;
   bidang: 'SOSHUM' | 'TEKREK';
   tanggal: string; // YYYY-MM-DD
   sesi: number; // 1, 2, 3, 4
+  fakultas?: string;
+  minggu?: string;
   npm: string;
   kelas: string;
   nama: string;
@@ -41,7 +60,10 @@ export interface JadwalKursus {
 
 export interface MateriKursus {
   id: number;
-  npm: string;
+  fakultas: string;
+  nama_fakultas?: string;
+  keterangan?: string;
+  npm?: string;
   nama?: string;
   materi_m1: string;
   materi_m2: string;

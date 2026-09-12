@@ -255,6 +255,8 @@ export const UploadJadwalModal: React.FC<UploadJadwalModalProps> = ({
                   <thead className="bg-gray-100 text-gray-600 font-semibold sticky top-0">
                     <tr>
                       <th className="px-3 py-2 border-b border-gray-200">Bidang</th>
+                      <th className="px-3 py-2 border-b border-gray-200">Fakultas</th>
+                      <th className="px-3 py-2 border-b border-gray-200 text-center">Minggu</th>
                       <th className="px-3 py-2 border-b border-gray-200">Tanggal</th>
                       <th className="px-3 py-2 border-b border-gray-200 text-center">Sesi</th>
                       <th className="px-3 py-2 border-b border-gray-200">NPM</th>
@@ -273,6 +275,20 @@ export const UploadJadwalModal: React.FC<UploadJadwalModalProps> = ({
                               row.Bidang === 'TEKREK' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'
                             }`}>
                               {row.Bidang}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            {row.Fakultas ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-[#525FE1] border border-indigo-100">
+                                {row.Fakultas}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300 text-[10px]">-</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-100">
+                              {row.Minggu || 'M1'}
                             </span>
                           </td>
                           <td className="px-3 py-2 font-mono text-gray-700">{row.Tanggal}</td>

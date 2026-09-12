@@ -174,13 +174,38 @@ export async function initDatabase(): Promise<DatabaseClient> {
       );
     `);
 
-    // 4. Tabel Jadwal Kursus Mahasiswa (Format Excel: Bidang, Tanggal, Sesi, NPM, Kelas, Nama)
+    // 4. Tabel Referensi Fakultas
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS ref_fakultas (
+        id SERIAL PRIMARY KEY,
+        kode_fakultas VARCHAR(20) UNIQUE NOT NULL,
+        nama_fakultas VARCHAR(150) NOT NULL,
+        keterangan VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 4b. Tabel Referensi Minggu (Default: M1 sampai dengan M10)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS ref_minggu (
+        id SERIAL PRIMARY KEY,
+        kode_minggu VARCHAR(20) UNIQUE NOT NULL,
+        nomor_minggu INT NOT NULL,
+        nama_minggu VARCHAR(100) NOT NULL,
+        keterangan VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 5. Tabel Jadwal Kursus Mahasiswa (Format Excel: Bidang, Tanggal, Sesi, Fakultas, Minggu, NPM, Kelas, Nama)
     await db.query(`
       CREATE TABLE IF NOT EXISTS jadwal_kursus (
         id SERIAL PRIMARY KEY,
         bidang VARCHAR(20) NOT NULL,
         tanggal DATE NOT NULL,
         sesi INT NOT NULL,
+        fakultas VARCHAR(50),
+        minggu VARCHAR(20) DEFAULT 'M1',
         npm VARCHAR(50) NOT NULL,
         kelas VARCHAR(50) NOT NULL,
         nama VARCHAR(255) NOT NULL,
@@ -190,18 +215,74 @@ export async function initDatabase(): Promise<DatabaseClient> {
       );
     `);
 
+    // Pastikan kolom fakultas dan minggu ada di jadwal_kursus pada database yang sudah ada
+    try {
+      await db.query(`ALTER TABLE jadwal_kursus ADD COLUMN IF NOT EXISTS fakultas VARCHAR(50);`);
+      await db.query(`ALTER TABLE jadwal_kursus ADD COLUMN IF NOT EXISTS minggu VARCHAR(20) DEFAULT 'M1';`);
+    } catch (e: any) {
+      // Kolom sudah ada
+    }
+
     // Indeks untuk pencarian cepat
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jadwal_npm ON jadwal_kursus(npm);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jadwal_tanggal ON jadwal_kursus(tanggal);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jadwal_sesi ON jadwal_kursus(sesi);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_jadwal_bidang ON jadwal_kursus(bidang);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jadwal_fakultas ON jadwal_kursus(fakultas);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_jadwal_minggu ON jadwal_kursus(minggu);`);
 
-    // 5. Tabel Materi Kursus Mahasiswa (M1 s/d M10)
+    // Inisialisasi nilai default referensi fakultas jika tabel masih kosong
+    try {
+      const checkFakultas = await db.query('SELECT COUNT(*) as count FROM ref_fakultas');
+      if (Number((checkFakultas.rows[0] as any)?.count || 0) === 0) {
+        await db.query(`
+          INSERT INTO ref_fakultas (kode_fakultas, nama_fakultas, keterangan) VALUES
+          ('FTI', 'Fakultas Teknologi Industri', 'Fakultas Teknologi Industri'),
+          ('FIKTI', 'Fakultas Ilmu Komputer dan Teknologi Informasi', 'Fakultas Ilmu Komputer dan Teknologi Informasi'),
+          ('FTSP', 'Fakultas Teknik Sipil dan Prencanaan', 'Fakultas Teknik Sipil dan Prencanaan'),
+          ('FIKES', 'Fakultas Ilmu Kesehatan Masyarakat', 'Fakultas Ilmu Kesehatan Masyarakat'),
+          ('FE', 'Fakultas Ekonomi', 'Fakultas Ekonomi'),
+          ('FSB', 'Fakultas Sastra dan Bahasa', 'Fakultas Sastra dan Bahasa'),
+          ('FPSI', 'Fakultas Psikologi', 'Fakultas Psikologi'),
+          ('FIKOM', 'Fakultas Ilmu Ekonomi', 'Fakultas Ilmu Ekonomi')
+          ON CONFLICT (kode_fakultas) DO NOTHING;
+        `);
+        console.log('[Database] Nilai default referensi fakultas berhasil diinisialisasi.');
+      }
+    } catch (e: any) {
+      console.warn('[Database] Inisialisasi default ref_fakultas:', e.message);
+    }
+
+    // Inisialisasi nilai default referensi minggu M1 s/d M10 jika tabel masih kosong
+    try {
+      const checkMinggu = await db.query('SELECT COUNT(*) as count FROM ref_minggu');
+      if (Number((checkMinggu.rows[0] as any)?.count || 0) === 0) {
+        await db.query(`
+          INSERT INTO ref_minggu (kode_minggu, nomor_minggu, nama_minggu, keterangan) VALUES
+          ('M1', 1, 'Minggu 1', 'Pertemuan Perkuliahan Minggu ke-1'),
+          ('M2', 2, 'Minggu 2', 'Pertemuan Perkuliahan Minggu ke-2'),
+          ('M3', 3, 'Minggu 3', 'Pertemuan Perkuliahan Minggu ke-3'),
+          ('M4', 4, 'Minggu 4', 'Pertemuan Perkuliahan Minggu ke-4'),
+          ('M5', 5, 'Minggu 5', 'Pertemuan Perkuliahan Minggu ke-5'),
+          ('M6', 6, 'Minggu 6', 'Pertemuan Perkuliahan Minggu ke-6'),
+          ('M7', 7, 'Minggu 7', 'Pertemuan Perkuliahan Minggu ke-7'),
+          ('M8', 8, 'Minggu 8', 'Pertemuan Perkuliahan Minggu ke-8'),
+          ('M9', 9, 'Minggu 9', 'Pertemuan Perkuliahan Minggu ke-9'),
+          ('M10', 10, 'Minggu 10', 'Pertemuan Perkuliahan Minggu ke-10')
+          ON CONFLICT (kode_minggu) DO NOTHING;
+        `);
+        console.log('[Database] Nilai default referensi minggu M1-M10 berhasil diinisialisasi.');
+      }
+    } catch (e: any) {
+      console.warn('[Database] Inisialisasi default ref_minggu:', e.message);
+    }
+
+    // 5. Tabel Materi Kursus Mahasiswa (M1 s/d M10) Berdasarkan FAKULTAS
     await db.query(`
       CREATE TABLE IF NOT EXISTS materi_kursus (
         id SERIAL PRIMARY KEY,
-        npm VARCHAR(50) UNIQUE NOT NULL,
-        nama VARCHAR(255),
+        fakultas VARCHAR(50),
+        keterangan VARCHAR(255),
         materi_m1 TEXT,
         materi_m2 TEXT,
         materi_m3 TEXT,
@@ -216,7 +297,60 @@ export async function initDatabase(): Promise<DatabaseClient> {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_materi_npm ON materi_kursus(npm);`);
+
+    // Pastikan kolom fakultas dan keterangan ada jika tabel sebelumnya ada
+    try {
+      await db.query(`ALTER TABLE materi_kursus ADD COLUMN IF NOT EXISTS fakultas VARCHAR(50);`);
+      await db.query(`ALTER TABLE materi_kursus ADD COLUMN IF NOT EXISTS keterangan VARCHAR(255);`);
+      await db.query(`ALTER TABLE materi_kursus ALTER COLUMN npm DROP NOT NULL;`);
+    } catch (e: any) {}
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_materi_fakultas ON materi_kursus(fakultas);`);
+
+    // Inisialisasi materi default per fakultas jika tabel materi belum ada data fakultas
+    try {
+      const checkMateri = await db.query('SELECT COUNT(*) as count FROM materi_kursus WHERE fakultas IS NOT NULL');
+      if (Number((checkMateri.rows[0] as any)?.count || 0) === 0) {
+        await db.query(`
+          INSERT INTO materi_kursus (fakultas, keterangan, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10) VALUES
+          ('FIKTI', 'Kurikulum Komputasi & Pemrograman Terapan',
+           'Pengenalan Algoritma & Dasar Pemrograman', 
+           'Variabel, Tipe Data, & Operator Logika', 
+           'Struktur Percabangan If-Else & Switch-Case', 
+           'Perulangan For, While & Do-While', 
+           'Fungsi & Prosedur Modular', 
+           'Array 1 Dimensi & 2 Dimensi', 
+           'Pointer & Manajemen Alokasi Memori', 
+           'Struktur Data Stack & Queue', 
+           'Algoritma Sorting & Searching', 
+           'Proyek Mini Solusi Algoritma Mandiri'),
+          ('FTI', 'Kurikulum Sistem Basis Data & Rekayasa Industri',
+           'Pengantar Basis Data Relasional & DBMS', 
+           'Perancangan ERD & Normalisasi 3NF', 
+           'Data Definition Language (CREATE/ALTER/DROP)', 
+           'Data Manipulation Language (INSERT/UPDATE/DELETE)', 
+           'Query SELECT, WHERE, ORDER BY, GROUP BY', 
+           'Relasi Antar Tabel: INNER JOIN & LEFT JOIN', 
+           'Subquery & Database View Dinamis', 
+           'Stored Procedure & User Defined Function', 
+           'Database Trigger & Optimasi Indeks', 
+           'Backup, Restore, & Manajemen Hak Akses'),
+          ('FE', 'Kurikulum Manajemen Bisnis & Analisis Pasar',
+           'Komunikasi Bisnis & Negosiasi Interpersonal', 
+           'Teknik Presentasi & Pitching Ide Bisnis', 
+           'Etika Profesi & Tata Kelola Bisnis Modern', 
+           'Manajemen Organisasi & Pengembangan SDM', 
+           'Riset Pasar & Analisis Perilaku Konsumen', 
+           'Strategi Pemasaran Digital & Social Media', 
+           'Kepemimpinan & Kerja Sama Tim Lintas Fungsi', 
+           'Perencanaan Rencana Bisnis Strategis (Business Plan)', 
+           'Evaluasi Kinerja Keuangan & Manajemen Risiko', 
+           'Presentasi Sidang Studi Kasus Akhir');
+        `);
+        console.log('[Database] Materi default berdasarkan fakultas berhasil diinisialisasi.');
+      }
+    } catch (e: any) {
+      console.warn('[Database] Inisialisasi materi default:', e.message);
+    }
 
     // 6. Tabel Status Login Mahasiswa (Input otomatis oleh sistem lain)
     await db.query(`
@@ -301,10 +435,11 @@ export async function getDatabaseStatus() {
   }
 
   try {
-    const [adminRes, sesiRes, kelasRes, jadwalRes, materiRes, statusLoginRes] = await Promise.all([
+    const [adminRes, sesiRes, kelasRes, fakultasRes, jadwalRes, materiRes, statusLoginRes] = await Promise.all([
       db.query(`SELECT COUNT(*) as count FROM admin_users`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM ref_sesi`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM ref_kelas`).catch(() => ({ rows: [{ count: 0 }] })),
+      db.query(`SELECT COUNT(*) as count FROM ref_fakultas`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM jadwal_kursus`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM materi_kursus`).catch(() => ({ rows: [{ count: 0 }] })),
       db.query(`SELECT COUNT(*) as count FROM status_login_mahasiswa`).catch(() => ({ rows: [{ count: 0 }] })),
@@ -318,7 +453,7 @@ export async function getDatabaseStatus() {
       },
       {
         name: 'jadwal_kursus',
-        description: 'Data jadwal mahasiswa hasil upload Excel (Bidang, Tanggal, Sesi, NPM, Kelas, Nama)',
+        description: 'Data jadwal mahasiswa hasil upload Excel (Bidang, Tanggal, Sesi, Fakultas, NPM, Kelas, Nama)',
         rowCount: Number((jadwalRes.rows[0] as any)?.count || 0),
       },
       {
@@ -335,6 +470,11 @@ export async function getDatabaseStatus() {
         name: 'ref_kelas',
         description: 'Referensi daftar kelas per bidang SOSHUM & TEKREK',
         rowCount: Number((kelasRes.rows[0] as any)?.count || 0),
+      },
+      {
+        name: 'ref_fakultas',
+        description: 'Referensi daftar fakultas universitas (FTI, FIKTI, FTSP, dll)',
+        rowCount: Number((fakultasRes.rows[0] as any)?.count || 0),
       },
       {
         name: 'admin_users',

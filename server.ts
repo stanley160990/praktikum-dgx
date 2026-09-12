@@ -178,14 +178,14 @@ app.post('/api/auth/change-password', async (req, res) => {
 // 3. Get Jadwal List (with search, filter, sorting)
 app.get('/api/jadwal', async (req, res) => {
   try {
-    const { search, bidang, sesi, tanggal, kelas } = req.query;
+    const { search, bidang, sesi, tanggal, kelas, fakultas } = req.query;
 
     let sql = `SELECT * FROM jadwal_kursus WHERE 1=1`;
     const params: any[] = [];
     let pIdx = 1;
 
     if (search) {
-      sql += ` AND (nama ILIKE $${pIdx} OR npm ILIKE $${pIdx} OR kelas ILIKE $${pIdx})`;
+      sql += ` AND (nama ILIKE $${pIdx} OR npm ILIKE $${pIdx} OR kelas ILIKE $${pIdx} OR COALESCE(fakultas, '') ILIKE $${pIdx})`;
       params.push(`%${search}%`);
       pIdx++;
     }
@@ -211,6 +211,12 @@ app.get('/api/jadwal', async (req, res) => {
     if (kelas) {
       sql += ` AND kelas = $${pIdx}`;
       params.push(kelas);
+      pIdx++;
+    }
+
+    if (fakultas) {
+      sql += ` AND fakultas = $${pIdx}`;
+      params.push(fakultas);
       pIdx++;
     }
 
@@ -242,10 +248,12 @@ app.get('/api/jadwal', async (req, res) => {
 // 4. Create Single Jadwal Manual
 app.post('/api/jadwal', async (req, res) => {
   try {
-    const { bidang, tanggal, sesi, npm, kelas, nama } = req.body;
+    const { bidang, tanggal, sesi, fakultas, minggu, npm, kelas, nama } = req.body;
     if (!bidang || !tanggal || !sesi || !npm || !kelas || !nama) {
       return res.status(400).json({ success: false, message: 'Semua field wajib diisi lengkap!' });
     }
+
+    const cleanMinggu = (minggu || 'M1').toString().trim().toUpperCase();
 
     // Check if NPM already exists
     const checkResult = await db.query('SELECT COUNT(*) as count FROM jadwal_kursus WHERE npm = $1', [npm]);
@@ -253,11 +261,11 @@ app.post('/api/jadwal', async (req, res) => {
     const statusEntry = isDuplicate ? 'DUPLIKAT_DITAMBAHKAN' : 'BARU';
 
     const insertSql = `
-      INSERT INTO jadwal_kursus (bidang, tanggal, sesi, npm, kelas, nama, status_entry, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO jadwal_kursus (bidang, tanggal, sesi, fakultas, minggu, npm, kelas, nama, status_entry, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *;
     `;
-    const result = await db.query(insertSql, [bidang, tanggal, Number(sesi), npm, kelas, nama, statusEntry]);
+    const result = await db.query(insertSql, [bidang, tanggal, Number(sesi), (fakultas || '').trim(), cleanMinggu, npm, kelas, nama, statusEntry]);
 
     res.json({
       success: true,
@@ -274,15 +282,16 @@ app.post('/api/jadwal', async (req, res) => {
 app.put('/api/jadwal/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { bidang, tanggal, sesi, npm, kelas, nama } = req.body;
+    const { bidang, tanggal, sesi, fakultas, minggu, npm, kelas, nama } = req.body;
+    const cleanMinggu = (minggu || 'M1').toString().trim().toUpperCase();
 
     const updateSql = `
       UPDATE jadwal_kursus
-      SET bidang = $1, tanggal = $2, sesi = $3, npm = $4, kelas = $5, nama = $6, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $7
+      SET bidang = $1, tanggal = $2, sesi = $3, fakultas = $4, minggu = $5, npm = $6, kelas = $7, nama = $8, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $9
       RETURNING *;
     `;
-    const result = await db.query(updateSql, [bidang, tanggal, Number(sesi), npm, kelas, nama, Number(id)]);
+    const result = await db.query(updateSql, [bidang, tanggal, Number(sesi), (fakultas || '').trim(), cleanMinggu, npm, kelas, nama, Number(id)]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
@@ -325,6 +334,9 @@ app.post('/api/jadwal/bulk-upload', async (req, res) => {
       const bidang = (item.bidang || item.Bidang || '').toString().trim().toUpperCase();
       let tanggal = (item.tanggal || item.Tanggal || '').toString().trim();
       const sesi = parseInt(item.sesi || item.Sesi || '1', 10);
+      const fakultas = (item.fakultas || item.Fakultas || item.FAKULTAS || item.kode_fakultas || '').toString().trim();
+      const rawMinggu = (item.minggu || item.Minggu || item.MINGGU || item.m || item.M || 'M1').toString().trim().toUpperCase();
+      const minggu = rawMinggu.startsWith('M') ? rawMinggu : `M${rawMinggu}`;
       const npm = (item.npm || item.NPM || '').toString().trim();
       const kelas = (item.kelas || item.Kelas || '').toString().trim();
       const nama = (item.nama || item.Nama || '').toString().trim();
@@ -346,8 +358,8 @@ app.post('/api/jadwal/bulk-upload', async (req, res) => {
       }
 
       const insertQuery = `
-        INSERT INTO jadwal_kursus (bidang, tanggal, sesi, npm, kelas, nama, status_entry, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO jadwal_kursus (bidang, tanggal, sesi, fakultas, minggu, npm, kelas, nama, status_entry, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         RETURNING *;
       `;
 
@@ -355,6 +367,8 @@ app.post('/api/jadwal/bulk-upload', async (req, res) => {
         validBidang,
         tanggal,
         sesi,
+        fakultas,
+        minggu,
         npm,
         kelas,
         nama,
@@ -381,17 +395,18 @@ app.post('/api/jadwal/bulk-upload', async (req, res) => {
 });
 
 // ==========================================
-// MATERI MAHASISWA (M1 - M10) API ROUTES
+// MATERI KURSUS (M1 - M10 BERDASARKAN FAKULTAS) API ROUTES
 // ==========================================
 
-// GET all materi
+// GET all materi berdasarkan fakultas
 app.get('/api/materi', async (req, res) => {
   try {
     const query = `
       SELECT 
         m.id,
-        m.npm,
-        COALESCE(NULLIF(m.nama, ''), (SELECT j.nama FROM jadwal_kursus j WHERE j.npm = m.npm ORDER BY j.id DESC LIMIT 1), 'Mahasiswa') as nama,
+        COALESCE(m.fakultas, '') as fakultas,
+        COALESCE(rf.nama_fakultas, m.fakultas, 'Fakultas') as nama_fakultas,
+        COALESCE(m.keterangan, '') as keterangan,
         COALESCE(m.materi_m1, '') as materi_m1,
         COALESCE(m.materi_m2, '') as materi_m2,
         COALESCE(m.materi_m3, '') as materi_m3,
@@ -405,7 +420,8 @@ app.get('/api/materi', async (req, res) => {
         TO_CHAR(m.created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at,
         TO_CHAR(m.updated_at, 'YYYY-MM-DD HH24:MI:SS') as updated_at
       FROM materi_kursus m
-      ORDER BY m.id DESC;
+      LEFT JOIN ref_fakultas rf ON m.fakultas = rf.kode_fakultas
+      ORDER BY m.fakultas ASC, m.id DESC;
     `;
     const result = await db.query(query);
     res.json({ success: true, data: result.rows });
@@ -415,110 +431,25 @@ app.get('/api/materi', async (req, res) => {
   }
 });
 
-// POST bulk upload materi from Excel
-app.post('/api/materi/bulk-upload', async (req, res) => {
-  try {
-    const { rows } = req.body;
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ success: false, message: 'Data baris Excel materi tidak valid atau kosong.' });
-    }
-
-    let processedCount = 0;
-    for (const row of rows) {
-      const npm = String(row.npm || '').trim();
-      if (!npm) continue;
-
-      let nama = String(row.nama || '').trim();
-      if (!nama) {
-        // Try looking up name from jadwal_kursus
-        const checkName = await db.query('SELECT nama FROM jadwal_kursus WHERE npm = $1 LIMIT 1', [npm]);
-        if (checkName.rows.length > 0 && (checkName.rows[0] as any)?.nama) {
-          nama = (checkName.rows[0] as any).nama;
-        }
-      }
-
-      const m1 = String(row.materi_m1 || '').trim();
-      const m2 = String(row.materi_m2 || '').trim();
-      const m3 = String(row.materi_m3 || '').trim();
-      const m4 = String(row.materi_m4 || '').trim();
-      const m5 = String(row.materi_m5 || '').trim();
-      const m6 = String(row.materi_m6 || '').trim();
-      const m7 = String(row.materi_m7 || '').trim();
-      const m8 = String(row.materi_m8 || '').trim();
-      const m9 = String(row.materi_m9 || '').trim();
-      const m10 = String(row.materi_m10 || '').trim();
-
-      const upsertQuery = `
-        INSERT INTO materi_kursus (npm, nama, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
-        ON CONFLICT (npm) DO UPDATE
-        SET nama = COALESCE(NULLIF(EXCLUDED.nama, ''), materi_kursus.nama),
-            materi_m1 = EXCLUDED.materi_m1,
-            materi_m2 = EXCLUDED.materi_m2,
-            materi_m3 = EXCLUDED.materi_m3,
-            materi_m4 = EXCLUDED.materi_m4,
-            materi_m5 = EXCLUDED.materi_m5,
-            materi_m6 = EXCLUDED.materi_m6,
-            materi_m7 = EXCLUDED.materi_m7,
-            materi_m8 = EXCLUDED.materi_m8,
-            materi_m9 = EXCLUDED.materi_m9,
-            materi_m10 = EXCLUDED.materi_m10,
-            updated_at = CURRENT_TIMESTAMP;
-      `;
-
-      await db.query(upsertQuery, [npm, nama, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10]);
-      processedCount++;
-    }
-
-    res.json({
-      success: true,
-      message: `Berhasil mengunggah dan menyimpan data materi untuk ${processedCount} mahasiswa!`,
-      count: processedCount,
-    });
-  } catch (err: any) {
-    console.error('Bulk upload materi error:', err);
-    res.status(500).json({ success: false, message: 'Gagal mengupload materi: ' + err.message });
-  }
-});
-
-// POST single materi (manual create or upsert)
+// POST single materi (Tambah materi berdasarkan fakultas)
 app.post('/api/materi', async (req, res) => {
   try {
-    const { npm, nama, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10 } = req.body;
-    if (!npm) {
-      return res.status(400).json({ success: false, message: 'NPM wajib diisi!' });
+    const { fakultas, keterangan, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10 } = req.body;
+    if (!fakultas || !fakultas.toString().trim()) {
+      return res.status(400).json({ success: false, message: 'Fakultas wajib dipilih dari referensi!' });
     }
 
-    let finalNama = (nama || '').trim();
-    if (!finalNama) {
-      const checkName = await db.query('SELECT nama FROM jadwal_kursus WHERE npm = $1 LIMIT 1', [npm]);
-      if (checkName.rows.length > 0 && (checkName.rows[0] as any)?.nama) {
-        finalNama = (checkName.rows[0] as any).nama;
-      }
-    }
+    const cleanFakultas = fakultas.toString().trim().toUpperCase();
 
-    const upsertQuery = `
-      INSERT INTO materi_kursus (npm, nama, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
-      ON CONFLICT (npm) DO UPDATE
-      SET nama = COALESCE(NULLIF(EXCLUDED.nama, ''), materi_kursus.nama),
-          materi_m1 = EXCLUDED.materi_m1,
-          materi_m2 = EXCLUDED.materi_m2,
-          materi_m3 = EXCLUDED.materi_m3,
-          materi_m4 = EXCLUDED.materi_m4,
-          materi_m5 = EXCLUDED.materi_m5,
-          materi_m6 = EXCLUDED.materi_m6,
-          materi_m7 = EXCLUDED.materi_m7,
-          materi_m8 = EXCLUDED.materi_m8,
-          materi_m9 = EXCLUDED.materi_m9,
-          materi_m10 = EXCLUDED.materi_m10,
-          updated_at = CURRENT_TIMESTAMP
+    const insertQuery = `
+      INSERT INTO materi_kursus (fakultas, keterangan, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *;
     `;
 
-    const result = await db.query(upsertQuery, [
-      npm,
-      finalNama,
+    const result = await db.query(insertQuery, [
+      cleanFakultas,
+      (keterangan || '').trim(),
       materi_m1 || '',
       materi_m2 || '',
       materi_m3 || '',
@@ -531,50 +462,57 @@ app.post('/api/materi', async (req, res) => {
       materi_m10 || '',
     ]);
 
-    res.json({ success: true, message: 'Data materi berhasil disimpan.', data: result.rows[0] });
+    res.json({ success: true, message: 'Data materi fakultas berhasil ditambahkan.', data: result.rows[0] });
   } catch (err: any) {
+    console.error('Insert materi error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// PUT update single materi by ID
+// PUT update materi by ID
 app.put('/api/materi/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { npm, nama, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10 } = req.body;
+    const { fakultas, keterangan, materi_m1, materi_m2, materi_m3, materi_m4, materi_m5, materi_m6, materi_m7, materi_m8, materi_m9, materi_m10 } = req.body;
+
+    if (!fakultas || !fakultas.toString().trim()) {
+      return res.status(400).json({ success: false, message: 'Fakultas wajib diisi!' });
+    }
+
+    const cleanFakultas = fakultas.toString().trim().toUpperCase();
 
     const updateQuery = `
       UPDATE materi_kursus
-      SET npm = COALESCE($1, npm),
-          nama = COALESCE($2, nama),
-          materi_m1 = COALESCE($3, materi_m1),
-          materi_m2 = COALESCE($4, materi_m2),
-          materi_m3 = COALESCE($5, materi_m3),
-          materi_m4 = COALESCE($6, materi_m4),
-          materi_m5 = COALESCE($7, materi_m5),
-          materi_m6 = COALESCE($8, materi_m6),
-          materi_m7 = COALESCE($9, materi_m7),
-          materi_m8 = COALESCE($10, materi_m8),
-          materi_m9 = COALESCE($11, materi_m9),
-          materi_m10 = COALESCE($12, materi_m10),
+      SET fakultas = $1,
+          keterangan = $2,
+          materi_m1 = $3,
+          materi_m2 = $4,
+          materi_m3 = $5,
+          materi_m4 = $6,
+          materi_m5 = $7,
+          materi_m6 = $8,
+          materi_m7 = $9,
+          materi_m8 = $10,
+          materi_m9 = $11,
+          materi_m10 = $12,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $13
       RETURNING *;
     `;
 
     const result = await db.query(updateQuery, [
-      npm,
-      nama,
-      materi_m1,
-      materi_m2,
-      materi_m3,
-      materi_m4,
-      materi_m5,
-      materi_m6,
-      materi_m7,
-      materi_m8,
-      materi_m9,
-      materi_m10,
+      cleanFakultas,
+      (keterangan || '').trim(),
+      materi_m1 || '',
+      materi_m2 || '',
+      materi_m3 || '',
+      materi_m4 || '',
+      materi_m5 || '',
+      materi_m6 || '',
+      materi_m7 || '',
+      materi_m8 || '',
+      materi_m9 || '',
+      materi_m10 || '',
       id,
     ]);
 
@@ -679,6 +617,163 @@ app.delete('/api/referensi/kelas/:id', async (req, res) => {
   try {
     await db.query('DELETE FROM ref_kelas WHERE id = $1', [Number(req.params.id)]);
     res.json({ success: true, message: 'Kelas berhasil dihapus' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 10. Referensi Fakultas (Nilai Default: FTI, FIKTI, FTSP, FIKES, FE, FSB, FPSI, FIKOM)
+app.get('/api/referensi/fakultas', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM ref_fakultas ORDER BY kode_fakultas ASC');
+    res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/referensi/fakultas', async (req, res) => {
+  try {
+    const { kode_fakultas, nama_fakultas, keterangan } = req.body;
+    if (!kode_fakultas || !nama_fakultas) {
+      return res.status(400).json({ success: false, message: 'Kode Fakultas dan Nama Fakultas wajib diisi!' });
+    }
+
+    const cleanKode = kode_fakultas.toString().trim().toUpperCase();
+    const cleanNama = nama_fakultas.toString().trim();
+    const cleanKet = (keterangan || '').toString().trim();
+
+    const upsertSql = `
+      INSERT INTO ref_fakultas (kode_fakultas, nama_fakultas, keterangan)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (kode_fakultas) DO UPDATE
+      SET nama_fakultas = EXCLUDED.nama_fakultas,
+          keterangan = EXCLUDED.keterangan
+      RETURNING *;
+    `;
+    const result = await db.query(upsertSql, [cleanKode, cleanNama, cleanKet]);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/referensi/fakultas/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM ref_fakultas WHERE id = $1', [Number(req.params.id)]);
+    res.json({ success: true, message: 'Fakultas berhasil dihapus' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Reset / Seed Default Fakultas
+app.post('/api/referensi/fakultas/reset-default', async (req, res) => {
+  try {
+    const defaultFakultas = [
+      ['FTI', 'Fakultas Teknologi Industri', 'Fakultas Teknologi Industri'],
+      ['FIKTI', 'Fakultas Ilmu Komputer dan Teknologi Informasi', 'Fakultas Ilmu Komputer dan Teknologi Informasi'],
+      ['FTSP', 'Fakultas Teknik Sipil dan Prencanaan', 'Fakultas Teknik Sipil dan Prencanaan'],
+      ['FIKES', 'Fakultas Ilmu Kesehatan Masyarakat', 'Fakultas Ilmu Kesehatan Masyarakat'],
+      ['FE', 'Fakultas Ekonomi', 'Fakultas Ekonomi'],
+      ['FSB', 'Fakultas Sastra dan Bahasa', 'Fakultas Sastra dan Bahasa'],
+      ['FPSI', 'Fakultas Psikologi', 'Fakultas Psikologi'],
+      ['FIKOM', 'Fakultas Ilmu Ekonomi', 'Fakultas Ilmu Ekonomi'],
+    ];
+
+    for (const [kode, nama, ket] of defaultFakultas) {
+      await db.query(`
+        INSERT INTO ref_fakultas (kode_fakultas, nama_fakultas, keterangan)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (kode_fakultas) DO UPDATE
+        SET nama_fakultas = EXCLUDED.nama_fakultas,
+            keterangan = EXCLUDED.keterangan;
+      `, [kode, nama, ket]);
+    }
+
+    const all = await db.query('SELECT * FROM ref_fakultas ORDER BY kode_fakultas ASC');
+    res.json({ success: true, message: 'Berhasil memuat 8 referensi fakultas default!', data: all.rows });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// 11. Referensi Minggu (Default: M1 sampai dengan M10)
+app.get('/api/referensi/minggu', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM ref_minggu ORDER BY nomor_minggu ASC');
+    res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/referensi/minggu', async (req, res) => {
+  try {
+    const { kode_minggu, nomor_minggu, nama_minggu, keterangan } = req.body;
+    if (!kode_minggu || !nama_minggu) {
+      return res.status(400).json({ success: false, message: 'Kode Minggu dan Nama Minggu wajib diisi!' });
+    }
+
+    const cleanKode = kode_minggu.toString().trim().toUpperCase();
+    const cleanNama = nama_minggu.toString().trim();
+    const cleanKet = (keterangan || '').toString().trim();
+    const numMinggu = parseInt(nomor_minggu || cleanKode.replace(/\D/g, '') || '1', 10);
+
+    const upsertSql = `
+      INSERT INTO ref_minggu (kode_minggu, nomor_minggu, nama_minggu, keterangan)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (kode_minggu) DO UPDATE
+      SET nomor_minggu = EXCLUDED.nomor_minggu,
+          nama_minggu = EXCLUDED.nama_minggu,
+          keterangan = EXCLUDED.keterangan
+      RETURNING *;
+    `;
+    const result = await db.query(upsertSql, [cleanKode, numMinggu, cleanNama, cleanKet]);
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/referensi/minggu/:id', async (req, res) => {
+  try {
+    await db.query('DELETE FROM ref_minggu WHERE id = $1', [Number(req.params.id)]);
+    res.json({ success: true, message: 'Referensi minggu berhasil dihapus.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Reset / Seed Default Minggu (M1 s/d M10)
+app.post('/api/referensi/minggu/reset-default', async (req, res) => {
+  try {
+    const defaultMinggu = [
+      ['M1', 1, 'Minggu 1', 'Pertemuan Perkuliahan Minggu ke-1'],
+      ['M2', 2, 'Minggu 2', 'Pertemuan Perkuliahan Minggu ke-2'],
+      ['M3', 3, 'Minggu 3', 'Pertemuan Perkuliahan Minggu ke-3'],
+      ['M4', 4, 'Minggu 4', 'Pertemuan Perkuliahan Minggu ke-4'],
+      ['M5', 5, 'Minggu 5', 'Pertemuan Perkuliahan Minggu ke-5'],
+      ['M6', 6, 'Minggu 6', 'Pertemuan Perkuliahan Minggu ke-6'],
+      ['M7', 7, 'Minggu 7', 'Pertemuan Perkuliahan Minggu ke-7'],
+      ['M8', 8, 'Minggu 8', 'Pertemuan Perkuliahan Minggu ke-8'],
+      ['M9', 9, 'Minggu 9', 'Pertemuan Perkuliahan Minggu ke-9'],
+      ['M10', 10, 'Minggu 10', 'Pertemuan Perkuliahan Minggu ke-10'],
+    ];
+
+    for (const [kode, num, nama, ket] of defaultMinggu) {
+      await db.query(`
+        INSERT INTO ref_minggu (kode_minggu, nomor_minggu, nama_minggu, keterangan)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (kode_minggu) DO UPDATE
+        SET nomor_minggu = EXCLUDED.nomor_minggu,
+            nama_minggu = EXCLUDED.nama_minggu,
+            keterangan = EXCLUDED.keterangan;
+      `, [kode, num, nama, ket]);
+    }
+
+    const all = await db.query('SELECT * FROM ref_minggu ORDER BY nomor_minggu ASC');
+    res.json({ success: true, message: 'Berhasil memuat 10 referensi minggu default (M1 sampai dengan M10)!', data: all.rows });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
