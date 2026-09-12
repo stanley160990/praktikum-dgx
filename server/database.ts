@@ -358,12 +358,29 @@ export async function initDatabase(): Promise<DatabaseClient> {
         id SERIAL PRIMARY KEY,
         npm VARCHAR(50) NOT NULL,
         kelas VARCHAR(50) NOT NULL,
+        fakultas VARCHAR(50),
         sesi INT NOT NULL,
         tgl_login TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    try {
+      await db.query(`ALTER TABLE status_login_mahasiswa ADD COLUMN IF NOT EXISTS fakultas VARCHAR(50);`);
+      // Backfill fakultas dari jadwal_kursus jika ada data status_login_mahasiswa yang fakultas-nya belum terisi
+      await db.query(`
+        UPDATE status_login_mahasiswa s
+        SET fakultas = j.fakultas
+        FROM (
+          SELECT npm, MAX(fakultas) as fakultas 
+          FROM jadwal_kursus 
+          WHERE fakultas IS NOT NULL AND fakultas != '' 
+          GROUP BY npm
+        ) j
+        WHERE s.npm = j.npm AND (s.fakultas IS NULL OR s.fakultas = '');
+      `);
+    } catch (e: any) {}
     await db.query(`CREATE INDEX IF NOT EXISTS idx_status_login_npm ON status_login_mahasiswa(npm);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_status_login_tgl ON status_login_mahasiswa(tgl_login);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_status_login_fakultas ON status_login_mahasiswa(fakultas);`);
 
     // 7. Tabel Arsip Jadwal Mahasiswa (Arsip per Semester)
     // Berisi hanya: npm, kelas, nama_mahasiswa, sesi, dan nama semester
@@ -380,6 +397,23 @@ export async function initDatabase(): Promise<DatabaseClient> {
     `);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_archive_semester ON jadwal_kursus_archive(nama_semester);`);
     await db.query(`CREATE INDEX IF NOT EXISTS idx_archive_npm ON jadwal_kursus_archive(npm);`);
+
+    // 8. Tabel Arsip Riwayat Login Mahasiswa (Arsip per Semester)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS status_login_mahasiswa_archive (
+        id SERIAL PRIMARY KEY,
+        npm VARCHAR(50) NOT NULL,
+        kelas VARCHAR(50) NOT NULL,
+        fakultas VARCHAR(50),
+        sesi INT NOT NULL,
+        tgl_login TIMESTAMP WITH TIME ZONE,
+        nama_semester VARCHAR(100) NOT NULL,
+        archived_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_archive_login_semester ON status_login_mahasiswa_archive(nama_semester);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_archive_login_npm ON status_login_mahasiswa_archive(npm);`);
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_archive_login_tgl ON status_login_mahasiswa_archive(tgl_login);`);
 
     // TIDAK ADA AUTO-SEED DATA: Menjaga integritas data database eksisting pengguna
     console.log('[Database] Koneksi dan struktur tabel database siap. Mengikuti data riil yang ada.');

@@ -123,7 +123,8 @@ export const LiveStatusLoginView: React.FC<LiveStatusLoginViewProps> = ({
     const term = searchTerm.toLowerCase();
     const matchSearch =
       item.npm.toLowerCase().includes(term) ||
-      item.kelas.toLowerCase().includes(term);
+      item.kelas.toLowerCase().includes(term) ||
+      (item.fakultas && item.fakultas.toLowerCase().includes(term));
 
     const matchSesi = filterSesi === 'all' || String(item.sesi) === filterSesi;
 
@@ -143,11 +144,12 @@ export const LiveStatusLoginView: React.FC<LiveStatusLoginViewProps> = ({
       return;
     }
 
-    const headers = ['No', 'NPM', 'Kelas', 'Sesi', 'Waktu Login Hari Ini'];
+    const headers = ['No', 'NPM', 'Kelas', 'Fakultas', 'Sesi', 'Waktu Login Hari Ini'];
     const rows = filteredData.map((item, idx) => [
       idx + 1,
       `"${item.npm}"`,
       `"${item.kelas}"`,
+      `"${item.fakultas || '-'}"`,
       `"Sesi ${item.sesi}"`,
       `"${formatClockTime(item.tgl_login)}"`,
     ]);
@@ -171,11 +173,12 @@ export const LiveStatusLoginView: React.FC<LiveStatusLoginViewProps> = ({
       return;
     }
 
-    const headers = ['No', 'NPM', 'Kelas', 'Sesi', 'Tanggal & Waktu Login'];
+    const headers = ['No', 'NPM', 'Kelas', 'Fakultas', 'Sesi', 'Tanggal & Waktu Login'];
     const rows = filteredData.map((item, idx) => [
       idx + 1,
       item.npm,
       item.kelas,
+      item.fakultas || '-',
       `Sesi ${item.sesi}`,
       formatClockTime(item.tgl_login),
     ]);
@@ -422,6 +425,7 @@ export const LiveStatusLoginView: React.FC<LiveStatusLoginViewProps> = ({
                 <th className="py-3.5 px-4 text-center w-14">No</th>
                 <th className="py-3.5 px-4">NPM Mahasiswa</th>
                 <th className="py-3.5 px-4">Kelas</th>
+                <th className="py-3.5 px-4">Fakultas</th>
                 <th className="py-3.5 px-4">Sesi Kursus</th>
                 <th className="py-3.5 px-4">Jam Login</th>
                 <th className="py-3.5 px-4">Keterangan Waktu</th>
@@ -430,7 +434,7 @@ export const LiveStatusLoginView: React.FC<LiveStatusLoginViewProps> = ({
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-400">
+                  <td colSpan={7} className="py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-6 h-6 border-2 border-[#525FE1] border-t-transparent rounded-full animate-spin" />
                       <span>Memuat data live status login hari ini...</span>
@@ -439,7 +443,7 @@ export const LiveStatusLoginView: React.FC<LiveStatusLoginViewProps> = ({
                 </tr>
               ) : filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-400">
+                  <td colSpan={7} className="py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-[#525FE1] mb-1">
                         <Radio className="w-5 h-5 animate-pulse" />
@@ -478,6 +482,13 @@ export const LiveStatusLoginView: React.FC<LiveStatusLoginViewProps> = ({
                       {/* Kelas */}
                       <td className="py-3.5 px-4 font-semibold text-gray-800">
                         {item.kelas}
+                      </td>
+
+                      {/* Fakultas */}
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                          {item.fakultas || '-'}
+                        </span>
                       </td>
 
                       {/* Sesi */}

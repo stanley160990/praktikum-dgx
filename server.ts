@@ -840,36 +840,50 @@ app.post('/api/mahasiswa/check-login', async (req, res) => {
 // 11. Status Login Mahasiswa (Read-only view for admin, insert by external system)
 app.get('/api/status-login', async (req, res) => {
   try {
-    const { search, sesi, todayOnly, date } = req.query;
+    const { search, sesi, todayOnly, date, fakultas } = req.query;
     let query = `
-      SELECT id, npm, kelas, sesi, tgl_login
-      FROM status_login_mahasiswa
+      SELECT 
+        s.id, 
+        s.npm, 
+        s.kelas, 
+        s.sesi, 
+        s.tgl_login,
+        COALESCE(NULLIF(s.fakultas, ''), j.fakultas, '-') as fakultas
+      FROM status_login_mahasiswa s
+      LEFT JOIN LATERAL (
+        SELECT fakultas FROM jadwal_kursus WHERE npm = s.npm ORDER BY id DESC LIMIT 1
+      ) j ON true
     `;
     const conditions: string[] = [];
     const params: any[] = [];
 
     if (search) {
       params.push(`%${search}%`);
-      conditions.push(`(npm ILIKE $${params.length} OR kelas ILIKE $${params.length})`);
+      conditions.push(`(s.npm ILIKE $${params.length} OR s.kelas ILIKE $${params.length} OR COALESCE(s.fakultas, j.fakultas, '') ILIKE $${params.length})`);
+    }
+
+    if (fakultas && fakultas !== 'all') {
+      params.push(String(fakultas));
+      conditions.push(`(s.fakultas = $${params.length} OR j.fakultas = $${params.length})`);
     }
 
     if (sesi && sesi !== 'all') {
       params.push(parseInt(sesi as string, 10));
-      conditions.push(`sesi = $${params.length}`);
+      conditions.push(`s.sesi = $${params.length}`);
     }
 
     if (date) {
       params.push(String(date));
-      conditions.push(`to_char(tgl_login, 'YYYY-MM-DD') = $${params.length}`);
+      conditions.push(`to_char(s.tgl_login, 'YYYY-MM-DD') = $${params.length}`);
     } else if (todayOnly === 'true') {
-      conditions.push(`DATE(tgl_login) = CURRENT_DATE`);
+      conditions.push(`DATE(s.tgl_login) = CURRENT_DATE`);
     }
 
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    query += ` ORDER BY tgl_login DESC, id DESC LIMIT 500`;
+    query += ` ORDER BY s.tgl_login DESC, s.id DESC LIMIT 500`;
 
     const result = await db.query(query, params);
     res.json({
@@ -887,20 +901,31 @@ app.get('/api/status-login', async (req, res) => {
 app.post('/api/status-login', async (req, res) => {
   try {
     const { npm, kelas, sesi, tgl_login } = req.body;
+    let { fakultas } = req.body;
     if (!npm || !kelas || sesi === undefined) {
       return res.status(400).json({ success: false, message: 'Kolom npm, kelas, dan sesi wajib diisi oleh sistem eksternal!' });
+    }
+
+    // Jika fakultas belum diberikan, lookup dari jadwal_kursus
+    if (!fakultas) {
+      try {
+        const lookup = await db.query('SELECT fakultas FROM jadwal_kursus WHERE npm = $1 ORDER BY id DESC LIMIT 1', [String(npm).trim()]);
+        if (lookup.rows.length > 0 && lookup.rows[0].fakultas) {
+          fakultas = lookup.rows[0].fakultas;
+        }
+      } catch (err) {}
     }
 
     let result;
     if (tgl_login) {
       result = await db.query(
-        `INSERT INTO status_login_mahasiswa (npm, kelas, sesi, tgl_login) VALUES ($1, $2, $3, $4) RETURNING *`,
-        [String(npm).trim(), String(kelas).trim(), parseInt(sesi, 10), tgl_login]
+        `INSERT INTO status_login_mahasiswa (npm, kelas, fakultas, sesi, tgl_login) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [String(npm).trim(), String(kelas).trim(), fakultas || null, parseInt(sesi, 10), tgl_login]
       );
     } else {
       result = await db.query(
-        `INSERT INTO status_login_mahasiswa (npm, kelas, sesi, tgl_login) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING *`,
-        [String(npm).trim(), String(kelas).trim(), parseInt(sesi, 10)]
+        `INSERT INTO status_login_mahasiswa (npm, kelas, fakultas, sesi, tgl_login) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING *`,
+        [String(npm).trim(), String(kelas).trim(), fakultas || null, parseInt(sesi, 10)]
       );
     }
 
@@ -1051,6 +1076,159 @@ app.delete('/api/archive/semester/:nama_semester', async (req, res) => {
     res.json({ 
       success: true, 
       message: `Berhasil menghapus seluruh data archive untuk semester "${nama_semester}".` 
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ==========================================
+// 13. ARCHIVE RIWAYAT LOGIN MAHASISWA ROUTES
+// ==========================================
+
+// Pindahkan seluruh data dari status_login_mahasiswa ke status_login_mahasiswa_archive ditandai dengan nama_semester
+app.post('/api/archive/status-login', async (req, res) => {
+  try {
+    const { nama_semester } = req.body;
+    if (!nama_semester || !nama_semester.toString().trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Nama semester wajib diisi ketika melakukan archive riwayat login!' 
+      });
+    }
+
+    const cleanSemester = nama_semester.toString().trim();
+
+    // 1. Cek jumlah data yang akan di-archive
+    const countCheck = await db.query('SELECT COUNT(*) as count FROM status_login_mahasiswa');
+    const totalCount = Number((countCheck.rows[0] as any)?.count || 0);
+
+    if (totalCount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tabel riwayat login mahasiswa saat ini masih kosong, tidak ada data yang dapat di-archive.',
+      });
+    }
+
+    // 2. Salin seluruh data dari status_login_mahasiswa ke status_login_mahasiswa_archive
+    // Lookup fakultas dari jadwal_kursus jika belum terisi
+    await db.query(`
+      INSERT INTO status_login_mahasiswa_archive (npm, kelas, fakultas, sesi, tgl_login, nama_semester, archived_at)
+      SELECT 
+        s.npm, 
+        s.kelas, 
+        COALESCE(NULLIF(s.fakultas, ''), j.fakultas, '-'), 
+        s.sesi, 
+        s.tgl_login, 
+        $1, 
+        CURRENT_TIMESTAMP
+      FROM status_login_mahasiswa s
+      LEFT JOIN LATERAL (
+        SELECT fakultas FROM jadwal_kursus WHERE npm = s.npm ORDER BY id DESC LIMIT 1
+      ) j ON true;
+    `, [cleanSemester]);
+
+    // 3. Hapus data dari status_login_mahasiswa
+    await db.query('DELETE FROM status_login_mahasiswa');
+
+    console.log(`[Archive Login] Berhasil memindahkan ${totalCount} data riwayat login ke arsip semester "${cleanSemester}".`);
+
+    res.json({
+      success: true,
+      count: totalCount,
+      nama_semester: cleanSemester,
+      message: `Berhasil meng-archive ${totalCount} data riwayat login ke semester "${cleanSemester}". Tabel riwayat aktif kini telah dikosongkan.`,
+    });
+  } catch (err: any) {
+    console.error('Archive status login error:', err);
+    res.status(500).json({ success: false, message: 'Gagal melakukan proses archive riwayat login: ' + err.message });
+  }
+});
+
+// Ambil data riwayat login yang telah di-archive
+app.get('/api/archive/status-login', async (req, res) => {
+  try {
+    const { semester, search, fakultas, sesi } = req.query;
+    let sql = `
+      SELECT id, npm, kelas, fakultas, sesi, tgl_login, nama_semester, archived_at 
+      FROM status_login_mahasiswa_archive 
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    let pIdx = 1;
+
+    if (semester && String(semester).trim()) {
+      sql += ` AND nama_semester = $${pIdx}`;
+      params.push(String(semester).trim());
+      pIdx++;
+    }
+
+    if (fakultas && String(fakultas).trim() !== 'all') {
+      sql += ` AND fakultas = $${pIdx}`;
+      params.push(String(fakultas).trim());
+      pIdx++;
+    }
+
+    if (sesi && String(sesi).trim() !== 'all') {
+      sql += ` AND sesi = $${pIdx}`;
+      params.push(parseInt(String(sesi), 10));
+      pIdx++;
+    }
+
+    if (search && String(search).trim()) {
+      sql += ` AND (npm ILIKE $${pIdx} OR kelas ILIKE $${pIdx} OR COALESCE(fakultas, '') ILIKE $${pIdx} OR nama_semester ILIKE $${pIdx})`;
+      params.push(`%${String(search).trim()}%`);
+      pIdx++;
+    }
+
+    sql += ` ORDER BY tgl_login DESC, id DESC LIMIT 1000`;
+
+    const result = await db.query(sql, params);
+    res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    console.error('Fetch archive status login error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Daftar semester unik yang ada di arsip riwayat login
+app.get('/api/archive/status-login/semesters', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT nama_semester, COUNT(*) as total_login, MAX(archived_at) as last_archived
+      FROM status_login_mahasiswa_archive
+      GROUP BY nama_semester
+      ORDER BY MAX(archived_at) DESC
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    console.error('Fetch archive status login semesters error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Hapus satu baris data archive riwayat login
+app.delete('/api/archive/status-login/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query('DELETE FROM status_login_mahasiswa_archive WHERE id = $1 RETURNING *', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Data archive riwayat login tidak ditemukan.' });
+    }
+    res.json({ success: true, message: 'Data archive riwayat login berhasil dihapus.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Hapus batch archive riwayat login berdasarkan nama semester
+app.delete('/api/archive/status-login/semester/:nama_semester', async (req, res) => {
+  try {
+    const { nama_semester } = req.params;
+    await db.query('DELETE FROM status_login_mahasiswa_archive WHERE nama_semester = $1', [nama_semester]);
+    res.json({ 
+      success: true, 
+      message: `Berhasil menghapus seluruh arsip riwayat login untuk semester "${nama_semester}".` 
     });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

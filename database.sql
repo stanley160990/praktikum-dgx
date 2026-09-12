@@ -129,12 +129,13 @@ CREATE INDEX IF NOT EXISTS idx_materi_fakultas ON materi_kursus(fakultas);
 -- ------------------------------------------------------------
 -- 8. TABEL: status_login_mahasiswa
 -- Data login mahasiswa yang dicatat otomatis oleh sistem eksternal
--- Kolom: npm, kelas, sesi, tgl_login
+-- Kolom: npm, kelas, fakultas, sesi, tgl_login
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS status_login_mahasiswa (
     id SERIAL PRIMARY KEY,
     npm VARCHAR(50) NOT NULL,
     kelas VARCHAR(50) NOT NULL,
+    fakultas VARCHAR(50),
     sesi INT NOT NULL,
     tgl_login TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -142,6 +143,7 @@ CREATE TABLE IF NOT EXISTS status_login_mahasiswa (
 -- Indeks Performa Query Status Login
 CREATE INDEX IF NOT EXISTS idx_status_login_npm ON status_login_mahasiswa(npm);
 CREATE INDEX IF NOT EXISTS idx_status_login_tgl ON status_login_mahasiswa(tgl_login);
+CREATE INDEX IF NOT EXISTS idx_status_login_fakultas ON status_login_mahasiswa(fakultas);
 
 -- ------------------------------------------------------------
 -- 9. TABEL: jadwal_kursus_archive
@@ -160,6 +162,26 @@ CREATE TABLE IF NOT EXISTS jadwal_kursus_archive (
 
 CREATE INDEX IF NOT EXISTS idx_archive_semester ON jadwal_kursus_archive(nama_semester);
 CREATE INDEX IF NOT EXISTS idx_archive_npm ON jadwal_kursus_archive(npm);
+
+-- ------------------------------------------------------------
+-- 10. TABEL: status_login_mahasiswa_archive
+-- Data arsip riwayat login mahasiswa yang telah di-archive per semester
+-- Kolom: npm, kelas, fakultas, sesi, tgl_login, nama_semester, archived_at
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS status_login_mahasiswa_archive (
+    id SERIAL PRIMARY KEY,
+    npm VARCHAR(50) NOT NULL,
+    kelas VARCHAR(50) NOT NULL,
+    fakultas VARCHAR(50),
+    sesi INT NOT NULL,
+    tgl_login TIMESTAMP WITH TIME ZONE,
+    nama_semester VARCHAR(100) NOT NULL,
+    archived_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_archive_login_semester ON status_login_mahasiswa_archive(nama_semester);
+CREATE INDEX IF NOT EXISTS idx_archive_login_npm ON status_login_mahasiswa_archive(npm);
+CREATE INDEX IF NOT EXISTS idx_archive_login_tgl ON status_login_mahasiswa_archive(tgl_login);
 
 -- ============================================================
 -- DATA AWAL (INITIAL SEED DATA)

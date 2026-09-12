@@ -414,6 +414,7 @@ export default function App() {
             <StatusLoginMahasiswaView
               sesiList={sesiList}
               onNavigateToLive={() => setActiveTab('status-login-live')}
+              onNavigateToArchiveLogin={() => setActiveTab('archive-login')}
             />
           ) : activeTab === 'jadwal' ? (
             <JadwalTableView
@@ -428,11 +429,21 @@ export default function App() {
               onDelete={handleDelete}
               onOpenUploadModal={() => setUploadJadwalModalOpen(true)}
               onNavigateToUpload={() => setUploadJadwalModalOpen(true)}
-              onNavigateToArchive={() => setActiveTab('archive')}
+              onNavigateToArchive={() => setActiveTab('archive-jadwal')}
             />
-          ) : activeTab === 'archive' ? (
+          ) : activeTab === 'archive' || activeTab === 'archive-jadwal' ? (
             <ArchiveView
+              activeSubTab="jadwal"
+              onSubTabChange={(tab) => setActiveTab(tab === 'jadwal' ? 'archive-jadwal' : 'archive-login')}
               onNavigateToJadwal={() => setActiveTab('jadwal')}
+              onNavigateToStatusLogin={() => setActiveTab('status-login')}
+            />
+          ) : activeTab === 'archive-login' ? (
+            <ArchiveView
+              activeSubTab="login"
+              onSubTabChange={(tab) => setActiveTab(tab === 'jadwal' ? 'archive-jadwal' : 'archive-login')}
+              onNavigateToJadwal={() => setActiveTab('jadwal')}
+              onNavigateToStatusLogin={() => setActiveTab('status-login')}
             />
           ) : activeTab === 'materi' ? (
             <MateriTableView

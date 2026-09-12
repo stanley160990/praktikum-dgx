@@ -12,16 +12,40 @@ import {
   ChevronLeft, 
   ChevronRight,
   Filter,
-  Layers
+  Layers,
+  UserCheck,
+  FileSpreadsheet
 } from 'lucide-react';
 import { JadwalKursusArchive, ArchiveSemesterSummary } from '../types';
 import { exportArchiveToExcel } from '../utils/excelHelper';
+import { ArchiveLoginView } from './ArchiveLoginView';
 
 interface ArchiveViewProps {
   onNavigateToJadwal?: () => void;
+  onNavigateToStatusLogin?: () => void;
+  activeSubTab?: 'jadwal' | 'login';
+  onSubTabChange?: (tab: 'jadwal' | 'login') => void;
 }
 
-export const ArchiveView: React.FC<ArchiveViewProps> = ({ onNavigateToJadwal }) => {
+export const ArchiveView: React.FC<ArchiveViewProps> = ({ 
+  onNavigateToJadwal,
+  onNavigateToStatusLogin,
+  activeSubTab = 'jadwal',
+  onSubTabChange,
+}) => {
+  const [subTab, setSubTab] = useState<'jadwal' | 'login'>(activeSubTab);
+
+  useEffect(() => {
+    if (activeSubTab) {
+      setSubTab(activeSubTab);
+    }
+  }, [activeSubTab]);
+
+  const handleSubTabSwitch = (newTab: 'jadwal' | 'login') => {
+    setSubTab(newTab);
+    onSubTabChange?.(newTab);
+  };
+
   const [archiveList, setArchiveList] = useState<JadwalKursusArchive[]>([]);
   const [semesterSummary, setSemesterSummary] = useState<ArchiveSemesterSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,12 +150,56 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onNavigateToJadwal }) 
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
   const paginatedData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const handleExport = () => {
+  const handleExportExcel = () => {
+    if (filteredData.length === 0) {
+      showNotification('Tidak ada data yang dapat diekspor.', 'error');
+      return;
+    }
     const filename = selectedSemester 
-      ? `Archive_Mahasiswa_${selectedSemester.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`
-      : 'Semua_Archive_Mahasiswa.xlsx';
+      ? `Archive_Jadwal_Mahasiswa_${selectedSemester.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`
+      : 'Semua_Archive_Jadwal_Mahasiswa.xlsx';
     exportArchiveToExcel(filteredData, filename);
   };
+
+  const handleExportCSV = () => {
+    if (filteredData.length === 0) {
+      showNotification('Tidak ada data yang dapat diekspor.', 'error');
+      return;
+    }
+    const headers = ['No', 'NPM', 'Kelas', 'Nama Mahasiswa', 'Sesi', 'Nama Semester', 'Tanggal Diarsip'];
+    const rows = filteredData.map((item, idx) => [
+      idx + 1,
+      `"${item.npm}"`,
+      `"${item.kelas}"`,
+      `"${item.nama_mahasiswa}"`,
+      `"Sesi ${item.sesi}"`,
+      `"${item.nama_semester}"`,
+      `"${item.archived_at ? new Date(item.archived_at).toLocaleString('id-ID') : '-'}"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = selectedSemester 
+      ? `Archive_Jadwal_Mahasiswa_${selectedSemester.replace(/[^a-zA-Z0-9]/g, '_')}.csv`
+      : 'Semua_Archive_Jadwal_Mahasiswa.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // If subTab is 'login', render the ArchiveLoginView
+  if (subTab === 'login') {
+    return (
+      <ArchiveLoginView
+        onNavigateToStatusLogin={onNavigateToStatusLogin}
+        onSubTabChange={handleSubTabSwitch}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -151,6 +219,24 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onNavigateToJadwal }) 
         </div>
       )}
 
+      {/* Sub-menu Navigation Tabs between Archive Jadwal and Riwayat Login */}
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-3">
+        <button
+          onClick={() => handleSubTabSwitch('jadwal')}
+          className="px-4 py-2 rounded-xl text-xs font-bold bg-[#525FE1] text-white shadow-xs transition cursor-pointer flex items-center gap-2"
+        >
+          <Archive className="w-4 h-4 text-white" />
+          <span>Archive Jadwal Mahasiswa</span>
+        </button>
+        <button
+          onClick={() => handleSubTabSwitch('login')}
+          className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition cursor-pointer flex items-center gap-2"
+        >
+          <UserCheck className="w-4 h-4 text-gray-400" />
+          <span>Archive Riwayat Login</span>
+        </button>
+      </div>
+
       {/* Header Banner */}
       <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-start gap-3.5">
@@ -159,7 +245,7 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onNavigateToJadwal }) 
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black text-gray-900 tracking-tight">Data Archive Mahasiswa</h1>
+              <h1 className="text-xl font-black text-gray-900 tracking-tight">Data Archive Jadwal Mahasiswa</h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-[#525FE1] border border-indigo-200">
                 PostgreSQL
               </span>
@@ -171,11 +257,21 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onNavigateToJadwal }) 
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 self-end md:self-auto">
+          {onNavigateToJadwal && (
+            <button
+              onClick={onNavigateToJadwal}
+              className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-[#525FE1] text-xs font-bold rounded-lg transition"
+              title="Kembali ke Jadwal Mahasiswa Aktif"
+            >
+              <span>Jadwal Mahasiswa Aktif</span>
+            </button>
+          )}
+
           <button
             id="btn-refresh-archive"
             onClick={fetchArchiveData}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition"
+            className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-lg transition cursor-pointer"
             title="Muat Ulang Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -184,12 +280,22 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onNavigateToJadwal }) 
 
           <button
             id="btn-export-archive-excel"
-            onClick={handleExport}
+            onClick={handleExportExcel}
             disabled={filteredData.length === 0}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white text-xs font-bold rounded-lg shadow-xs transition"
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 text-white text-xs font-bold rounded-lg shadow-xs transition cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Export Excel</span>
+          </button>
+
+          <button
+            id="btn-export-archive-csv"
+            onClick={handleExportCSV}
+            disabled={filteredData.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-40 text-gray-700 text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
           >
             <Download className="w-4 h-4" />
-            <span>Export Excel Archive</span>
+            <span>Export CSV</span>
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { JadwalKursus, MateriKursus, JadwalKursusArchive } from '../types';
+import { JadwalKursus, MateriKursus, JadwalKursusArchive, StatusLoginArchive } from '../types';
 
 export interface ExcelRow {
   Bidang: string;
@@ -306,7 +306,27 @@ export function exportArchiveToExcel(data: JadwalKursusArchive[], filename = 'Da
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data_Archive');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data_Archive_Jadwal');
 
   XLSX.writeFile(workbook, filename);
 }
+
+export function exportStatusLoginArchiveToExcel(data: StatusLoginArchive[], filename = 'Data_Riwayat_Login_Archive.xlsx') {
+  const rows = data.map((d, index) => ({
+    No: index + 1,
+    NPM: d.npm,
+    Kelas: d.kelas,
+    Fakultas: d.fakultas || '-',
+    Sesi: `Sesi ${d.sesi}`,
+    'Tanggal & Waktu Login': d.tgl_login ? new Date(d.tgl_login).toLocaleString('id-ID') : '-',
+    'Nama Semester': d.nama_semester,
+    'Waktu Archive': d.archived_at ? new Date(d.archived_at).toLocaleString('id-ID') : '-',
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Archive_Riwayat_Login');
+
+  XLSX.writeFile(workbook, filename);
+}
+

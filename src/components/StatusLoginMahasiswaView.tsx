@@ -13,27 +13,41 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
-  Radio
+  Radio,
+  Archive,
+  AlertTriangle,
+  CheckCircle2,
+  X
 } from 'lucide-react';
 import { StatusLoginMahasiswa, RefSesi } from '../types';
 
 interface StatusLoginMahasiswaViewProps {
   sesiList: RefSesi[];
   onNavigateToLive?: () => void;
+  onNavigateToArchiveLogin?: () => void;
 }
 
 export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> = ({ 
   sesiList,
   onNavigateToLive,
+  onNavigateToArchiveLogin,
 }) => {
   const [data, setData] = useState<StatusLoginMahasiswa[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSesi, setFilterSesi] = useState<string>('all');
   const [filterKelas, setFilterKelas] = useState<string>('all');
+  const [filterFakultas, setFilterFakultas] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [lastRefreshed, setLastRefreshed] = useState<string>('');
+
+  // Archive Modal states
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [namaSemesterInput, setNamaSemesterInput] = useState('');
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archiveSuccessMsg, setArchiveSuccessMsg] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -58,8 +72,9 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
     fetchData();
   }, [filterSesi]);
 
-  // Unique list of kelas for filtering
+  // Unique lists for filtering
   const uniqueKelas = Array.from(new Set(data.map((d) => d.kelas).filter(Boolean))).sort();
+  const uniqueFakultas = Array.from(new Set(data.map((d) => d.fakultas).filter(Boolean))) as string[];
 
   // Filtered dataset
   const filteredData = data.filter((item) => {
@@ -67,11 +82,13 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
     const matchSearch = 
       item.npm.toLowerCase().includes(term) || 
       item.kelas.toLowerCase().includes(term) ||
+      (item.fakultas && item.fakultas.toLowerCase().includes(term)) ||
       `sesi ${item.sesi}`.toLowerCase().includes(term);
 
     const matchKelas = filterKelas === 'all' || item.kelas === filterKelas;
+    const matchFakultas = filterFakultas === 'all' || item.fakultas === filterFakultas;
 
-    return matchSearch && matchKelas;
+    return matchSearch && matchKelas && matchFakultas;
   });
 
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
@@ -96,6 +113,48 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
     }
   };
 
+  // Archive action handler
+  const handleTriggerArchive = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setArchiveError(null);
+    if (!namaSemesterInput.trim()) {
+      setArchiveError('Nama semester wajib diisi untuk menandai data archive riwayat login!');
+      return;
+    }
+
+    if (data.length === 0) {
+      setArchiveError('Tabel riwayat login saat ini masih kosong, tidak ada data untuk di-archive.');
+      return;
+    }
+
+    setArchiveLoading(true);
+    try {
+      const res = await fetch('/api/archive/status-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nama_semester: namaSemesterInput.trim() }),
+      });
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        throw new Error(resData.message || 'Gagal melakukan proses archive riwayat login.');
+      }
+      setArchiveSuccessMsg(resData.message);
+      fetchData();
+      setTimeout(() => {
+        setIsArchiveModalOpen(false);
+        setNamaSemesterInput('');
+        setArchiveSuccessMsg(null);
+        if (onNavigateToArchiveLogin) {
+          onNavigateToArchiveLogin();
+        }
+      }, 1500);
+    } catch (err: any) {
+      setArchiveError(err.message || 'Terjadi kesalahan sistem saat melakukan archive riwayat login.');
+    } finally {
+      setArchiveLoading(false);
+    }
+  };
+
   // Export to CSV
   const handleExportCSV = () => {
     if (filteredData.length === 0) {
@@ -103,11 +162,12 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
       return;
     }
 
-    const headers = ['No', 'NPM', 'Kelas', 'Sesi', 'Tanggal & Waktu Login'];
+    const headers = ['No', 'NPM', 'Kelas', 'Fakultas', 'Sesi', 'Tanggal & Waktu Login'];
     const rows = filteredData.map((item, idx) => [
       idx + 1,
       `"${item.npm}"`,
       `"${item.kelas}"`,
+      `"${item.fakultas || '-'}"`,
       `"Sesi ${item.sesi}"`,
       `"${formatDateTime(item.tgl_login)}"`,
     ]);
@@ -131,11 +191,12 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
       return;
     }
 
-    const headers = ['No', 'NPM', 'Kelas', 'Sesi', 'Tanggal Login'];
+    const headers = ['No', 'NPM', 'Kelas', 'Fakultas', 'Sesi', 'Tanggal Login'];
     const rows = filteredData.map((item, idx) => [
       idx + 1,
       item.npm,
       item.kelas,
+      item.fakultas || '-',
       `Sesi ${item.sesi}`,
       formatDateTime(item.tgl_login),
     ]);
@@ -162,15 +223,15 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-xs font-semibold backdrop-blur-xs">
             <UserCheck className="w-3.5 h-3.5" />
-            <span>Submenu: Riwayat Login</span>
+            <span>Riwayat Login Mahasiswa</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Riwayat Login Mahasiswa</h1>
           <p className="text-indigo-100 text-xs sm:text-sm max-w-2xl">
-            Tabel rekaman seluruh riwayat login mahasiswa yang terintegrasi langsung dengan database PostgreSQL.
+            Tabel rekaman seluruh riwayat login mahasiswa terintegrasi langsung dengan database PostgreSQL.
           </p>
         </div>
 
-        {/* Export Actions in Banner */}
+        {/* Export & Archive Actions in Banner */}
         <div className="flex flex-wrap items-center gap-2.5">
           {onNavigateToLive && (
             <button
@@ -183,6 +244,21 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
               <span>Live Status Hari Ini</span>
             </button>
           )}
+
+          {/* Archive Button */}
+          <button
+            id="btn-open-archive-login-modal"
+            onClick={() => {
+              setIsArchiveModalOpen(true);
+              setArchiveError(null);
+              setArchiveSuccessMsg(null);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs flex items-center gap-2 transition cursor-pointer"
+            title="Pindahkan seluruh data riwayat login saat ini ke Data Archive Riwayat Login"
+          >
+            <Archive className="w-4 h-4 text-amber-100" />
+            <span>Archive Riwayat Login</span>
+          </button>
 
           <button
             id="btn-export-excel-status-login"
@@ -223,7 +299,7 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
             Informasi Integrasi Sistem:
           </p>
           <p className="text-gray-600 leading-relaxed">
-            Data pada tabel ini diisi secara otomatis oleh sistem eksternal melalui endpoint API <code>POST /api/status-login</code> dengan format JSON: <code>{'{'} "npm": "...", "kelas": "...", "sesi": 1, "tgl_login": "..." {'}'}</code>. Tidak disediakan form input manual oleh admin karena seluruh pencatatan tersinkronisasi via sistem.
+            Data pada tabel ini dicatat oleh sistem eksternal melalui endpoint API <code>POST /api/status-login</code> dengan field: <code>npm</code>, <code>kelas</code>, <code>fakultas</code>, <code>sesi</code>, dan <code>tgl_login</code>. Untuk pergantian periode/semester, Anda dapat menggunakan tombol <strong>Archive Riwayat Login</strong> di atas untuk memindahkan data aktif ke <strong>Data Archive &gt; Riwayat Login</strong>.
           </p>
         </div>
       </div>
@@ -236,7 +312,7 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
           <input
             id="input-search-status-login"
             type="text"
-            placeholder="Cari NPM atau Kelas mahasiswa..."
+            placeholder="Cari NPM, Kelas, atau Fakultas mahasiswa..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -280,6 +356,26 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
             </select>
           </div>
 
+          {/* Fakultas Filter */}
+          {uniqueFakultas.length > 0 && (
+            <select
+              id="select-filter-fakultas"
+              value={filterFakultas}
+              onChange={(e) => {
+                setFilterFakultas(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white outline-none focus:border-[#525FE1]"
+            >
+              <option value="all">Semua Fakultas</option>
+              {uniqueFakultas.map((fak) => (
+                <option key={fak} value={fak}>
+                  {fak}
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* Kelas Filter */}
           {uniqueKelas.length > 0 && (
             <select
@@ -294,7 +390,7 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
               <option value="all">Semua Kelas</option>
               {uniqueKelas.map((k) => (
                 <option key={k} value={k}>
-                  Kelas {k}
+                  {k}
                 </option>
               ))}
             </select>
@@ -344,6 +440,7 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
                 <th className="py-3.5 px-4 text-center w-14">No</th>
                 <th className="py-3.5 px-4">NPM</th>
                 <th className="py-3.5 px-4">Kelas</th>
+                <th className="py-3.5 px-4">Fakultas</th>
                 <th className="py-3.5 px-4">Sesi</th>
                 <th className="py-3.5 px-4">Tanggal & Waktu Login</th>
               </tr>
@@ -351,7 +448,7 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-gray-400">
+                  <td colSpan={6} className="py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-6 h-6 border-2 border-[#525FE1] border-t-transparent rounded-full animate-spin" />
                       <span>Memuat data status login dari PostgreSQL...</span>
@@ -360,14 +457,14 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
                 </tr>
               ) : paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-gray-400">
+                  <td colSpan={6} className="py-12 text-center text-gray-400">
                     <div className="flex flex-col items-center justify-center gap-1">
                       <UserCheck className="w-8 h-8 text-gray-300 mb-1" />
                       <p className="font-semibold text-gray-600">Tidak ada data status login mahasiswa</p>
                       <p className="text-xs text-gray-400">
-                        {searchTerm || filterSesi !== 'all' || filterKelas !== 'all'
+                        {searchTerm || filterSesi !== 'all' || filterKelas !== 'all' || filterFakultas !== 'all'
                           ? 'Tidak ada hasil yang sesuai dengan kriteria filter.'
-                          : 'Belum ada data login yang dikirimkan oleh sistem eksternal.'}
+                          : 'Belum ada data login yang dicatat dalam tabel aktif.'}
                       </p>
                     </div>
                   </td>
@@ -398,6 +495,13 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
                       <td className="py-3.5 px-4">
                         <span className="font-semibold text-gray-800">
                           {item.kelas}
+                        </span>
+                      </td>
+
+                      {/* Fakultas */}
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                          {item.fakultas || '-'}
                         </span>
                       </td>
 
@@ -478,6 +582,117 @@ export const StatusLoginMahasiswaView: React.FC<StatusLoginMahasiswaViewProps> =
           </div>
         )}
       </div>
+
+      {/* Modal Archive Riwayat Login */}
+      {isArchiveModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 text-amber-600">
+                <div className="p-2 bg-amber-100 rounded-xl">
+                  <Archive className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-gray-900 text-base">Archive Riwayat Login</h3>
+              </div>
+              <button
+                onClick={() => setIsArchiveModalOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-1.5">
+              <div className="flex items-center gap-2 font-semibold">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Peringatan Proses Archive</span>
+              </div>
+              <p className="leading-relaxed">
+                Seluruh {data.length} rekaman riwayat login saat ini akan dipindahkan ke tabel arsip per semester (<strong>Data Archive &gt; Riwayat Login</strong>), dan tabel aktif akan dikosongkan untuk persiapan semester baru.
+              </p>
+            </div>
+
+            {archiveError && (
+              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{archiveError}</span>
+              </div>
+            )}
+
+            {archiveSuccessMsg && (
+              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{archiveSuccessMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleTriggerArchive} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                  Label / Nama Semester Archive <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: PTA 2024/2025 atau Semester Ganjil 2024"
+                  value={namaSemesterInput}
+                  onChange={(e) => setNamaSemesterInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition"
+                  disabled={archiveLoading || !!archiveSuccessMsg}
+                  autoFocus
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Nama ini akan digunakan untuk mengelompokkan data riwayat login saat dilihat di menu Data Archive.
+                </p>
+              </div>
+
+              {/* Quick suggestions */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] text-gray-500 font-medium">Contoh Cepat:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {['PTA 2024/2025', 'ATA 2024/2025', 'Semester Ganjil 2024/2025', 'Semester Genap 2024/2025'].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setNamaSemesterInput(s)}
+                      className="px-2 py-1 bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-800 rounded-md text-[11px] font-medium transition cursor-pointer"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsArchiveModalOpen(false)}
+                  disabled={archiveLoading}
+                  className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={archiveLoading || !!archiveSuccessMsg || !namaSemesterInput.trim()}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                >
+                  {archiveLoading ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Mengarsipkan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="w-3.5 h-3.5" />
+                      <span>Konfirmasi Archive</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -37,8 +37,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenUploadJadwalModal,
 }) => {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [archiveMenuOpen, setArchiveMenuOpen] = useState(false);
 
   const isStatusLoginActive = activeTab === 'status-login' || activeTab === 'status-login-live';
+  const isArchiveActive = activeTab === 'archive' || activeTab === 'archive-jadwal' || activeTab === 'archive-login';
 
   return (
     <>
@@ -237,24 +239,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Referensi Sesi & Kelas</span>
           </button>
 
-          {/* Data Archive - Urutan paling bawah */}
-          <button
-            id="nav-item-archive"
-            onClick={() => {
-              setActiveTab('archive');
-              setIsOpenMobile(false);
-            }}
-            className={`w-full flex items-center space-x-3 p-3 rounded-lg text-sm font-medium transition text-left ${
-              activeTab === 'archive'
-                ? 'bg-white/15 text-white shadow-xs font-semibold' 
-                : 'text-white/70 hover:text-white hover:bg-white/5 opacity-85 hover:opacity-100'
-            }`}
-          >
-            <div className={`w-5 h-5 flex items-center justify-center rounded-sm ${activeTab === 'archive' ? 'text-white' : 'text-white/80'}`}>
-              <Archive className="w-4 h-4" />
-            </div>
-            <span>Data Archive</span>
-          </button>
+          {/* Data Archive - Urutan paling bawah dengan Dua Sub Menu */}
+          <div className="space-y-1">
+            <button
+              id="nav-item-archive-parent"
+              onClick={() => {
+                setArchiveMenuOpen(!archiveMenuOpen);
+                if (!isArchiveActive) {
+                  setActiveTab('archive-jadwal');
+                }
+              }}
+              className={`w-full flex items-center justify-between p-3 rounded-lg text-sm font-medium transition text-left cursor-pointer ${
+                isArchiveActive
+                  ? 'bg-white/10 text-white font-semibold' 
+                  : 'text-white/70 hover:text-white hover:bg-white/5 opacity-85 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <div className={`w-5 h-5 flex items-center justify-center rounded-sm ${isArchiveActive ? 'text-white' : 'text-white/80'}`}>
+                  <Archive className="w-4 h-4" />
+                </div>
+                <span>Data Archive</span>
+              </div>
+              <div>
+                {archiveMenuOpen || isArchiveActive ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-white/70" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-white/70" />
+                )}
+              </div>
+            </button>
+
+            {/* Submenu container Data Archive */}
+            {(archiveMenuOpen || isArchiveActive) && (
+              <div className="pl-6 pr-1 py-1 space-y-1 border-l-2 border-white/20 ml-5">
+                {/* Submenu 1: Archive Jadwal Mahasiswa */}
+                <button
+                  id="nav-item-archive-jadwal"
+                  onClick={() => {
+                    setActiveTab('archive-jadwal');
+                    setIsOpenMobile(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition text-left cursor-pointer ${
+                    activeTab === 'archive-jadwal' || activeTab === 'archive'
+                      ? 'bg-white/20 text-white font-bold shadow-xs'
+                      : 'text-white/75 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Table className="w-3.5 h-3.5" />
+                  <span>Archive Jadwal Mahasiswa</span>
+                </button>
+
+                {/* Submenu 2: Riwayat Login */}
+                <button
+                  id="nav-item-archive-login"
+                  onClick={() => {
+                    setActiveTab('archive-login');
+                    setIsOpenMobile(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition text-left cursor-pointer ${
+                    activeTab === 'archive-login'
+                      ? 'bg-white/20 text-white font-bold shadow-xs'
+                      : 'text-white/75 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Riwayat Login</span>
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
 
         {/* Sidebar Footer */}

@@ -92,6 +92,7 @@ export interface StatusLoginMahasiswa {
   id: number;
   npm: string;
   kelas: string;
+  fakultas?: string;
   sesi: number;
   tgl_login: string;
 }
@@ -156,3 +157,21 @@ export interface ArchiveSemesterSummary {
   total_mahasiswa: number;
   last_archived?: string;
 }
+
+export interface StatusLoginArchive {
+  id: number;
+  npm: string;
+  kelas: string;
+  fakultas?: string;
+  sesi: number;
+  tgl_login: string;
+  nama_semester: string;
+  archived_at?: string;
+}
+
+export interface ArchiveLoginSemesterSummary {
+  nama_semester: string;
+  total_login: number;
+  last_archived?: string;
+}
+

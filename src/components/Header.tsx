@@ -97,7 +97,10 @@ export const Header: React.FC<HeaderProps> = ({
       case 'jadwal':
         return 'Jadwal Mahasiswa';
       case 'archive':
-        return 'Data Archive Mahasiswa';
+      case 'archive-jadwal':
+        return 'Data Archive Jadwal Mahasiswa';
+      case 'archive-login':
+        return 'Data Archive Riwayat Login';
       case 'materi':
         return 'Materi Mahasiswa';
       case 'status-login-live':
